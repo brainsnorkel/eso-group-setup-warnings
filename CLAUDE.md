@@ -23,10 +23,9 @@ The addon only activates detection when `IsUnitInRaid("player")` returns true (p
 
 ### On-Screen Status Indicator
 
-A movable UI element shows:
-- **Active state**: Icon or text indicating addon is monitoring (e.g., "GSW: Active" or eye icon)
-- **Rules enabled**: Which detection rules are currently on (abbreviated, e.g., "EO FB MC RO SB OI")
-- **Hidden when inactive**: Only visible in trials (or always visible per setting)
+A movable UI element that:
+- **Shows**: Icon or text (e.g., "GSW" or eye icon) when addon is enabled AND player is in a trial
+- **Hidden**: Invisible when disabled OR outside a trial
 
 ### Slash Commands
 
@@ -47,14 +46,12 @@ A movable UI element shows:
 | Enable Addon | Checkbox | On | Master on/off toggle |
 | Show Status Indicator | Checkbox | On | Show/hide on-screen indicator |
 | Indicator Locked | Checkbox | On | Lock indicator position |
-| Show Only In Trials | Checkbox | On | Hide indicator outside trials |
 
 ### Indicator Appearance
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | Font Size | Slider | 16 | Text size (12-24) |
 | Show As Icon | Checkbox | Off | Use icon instead of text |
-| Show Active Rules | Checkbox | On | Display which rules are enabled |
 
 ### Detection Rules (Individual Toggles)
 | Setting | Type | Default | Description |
