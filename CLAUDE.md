@@ -212,3 +212,21 @@ Use `.luacheckrc` in repo root with:
 - Throttle group scan events (use zo_callLater)
 - Cache zone checks to avoid repeated API calls
 - Use savedvars for user thresholds (min CP, required sets)
+
+## Changelog
+
+Maintain a changelog in CHANGELOG.md for each release. Format:
+
+```markdown
+## [1.1.0] - YYYY-MM-DD
+### Added
+- New feature description
+
+### Changed
+- Modified behavior description
+
+### Fixed
+- Bug fix description
+```
+
+Update the changelog before creating a release tag. The GitHub Actions workflow will auto-generate release notes, but CHANGELOG.md provides a human-curated history.
