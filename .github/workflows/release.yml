@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create addon zip
+        run: |
+          mkdir -p GroupSetupWarnings
+          cp GroupSetupWarnings.txt GroupSetupWarnings/
+          cp GroupSetupWarnings.xml GroupSetupWarnings/
+          cp GroupSetupWarnings.lua GroupSetupWarnings/
+          cp Settings.lua GroupSetupWarnings/
+          zip -r GroupSetupWarnings-${{ steps.version.outputs.VERSION }}.zip GroupSetupWarnings
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: GroupSetupWarnings-${{ steps.version.outputs.VERSION }}.zip
+          generate_release_notes: true
