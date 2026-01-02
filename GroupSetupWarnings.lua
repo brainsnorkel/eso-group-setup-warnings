@@ -55,7 +55,8 @@ function GSW.UpdateIndicator()
     -- Show indicator if: (enabled AND in trial) OR (unlocked for repositioning)
     local isActive = savedVars.enabled and isInTrial
     local isUnlocked = not savedVars.indicatorLocked
-    local shouldShow = savedVars.showIndicator and (isActive or isUnlocked)
+    -- Always show when unlocked (for repositioning), otherwise only when active
+    local shouldShow = isUnlocked or (savedVars.showIndicator and isActive)
 
     indicator:SetHidden(not shouldShow)
 
@@ -91,27 +92,10 @@ end
 -- Utility Functions
 --------------------------------------------------------------------------------
 
--- Trial zone IDs (12-player content)
-local TRIAL_ZONE_IDS = {
-    [636] = true,   -- Hel Ra Citadel
-    [638] = true,   -- Aetherian Archive
-    [639] = true,   -- Sanctum Ophidia
-    [725] = true,   -- Maw of Lorkhaj
-    [975] = true,   -- Halls of Fabrication
-    [1000] = true,  -- Asylum Sanctorium
-    [1051] = true,  -- Cloudrest
-    [1121] = true,  -- Sunspire
-    [1196] = true,  -- Kyne's Aegis
-    [1263] = true,  -- Rockgrove
-    [1344] = true,  -- Dreadsail Reef
-    [1427] = true,  -- Sanity's Edge
-    [1478] = true,  -- Lucent Citadel
-}
-
-local function IsInTrialZone()
-    if GetCurrentZoneId then
-        local zoneId = GetCurrentZoneId()
-        return TRIAL_ZONE_IDS[zoneId] == true
+local function IsInLargeGroup()
+    -- Large group is more than a 4-person dungeon group (5-12 players)
+    if GetGroupSize then
+        return GetGroupSize() > 4
     end
     return false
 end
@@ -127,12 +111,23 @@ local function GetPlayerNameFromUnitId(unitId)
 end
 
 local function OutputWarning(message)
-    -- Use system channel for visibility
-    CHAT_SYSTEM:AddMessage("|cFF6600[GSW]|r " .. message)
+    CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r " .. message)
 end
 
 local function OutputInfo(message)
-    CHAT_SYSTEM:AddMessage("|c00CCFF[GSW]|r " .. message)
+    CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r " .. message)
+end
+
+local function CheckTrialStatus()
+    local wasInTrial = isInTrial
+    isInTrial = IsInLargeGroup()
+
+    -- Show activation message when entering trial state
+    if isInTrial and not wasInTrial and savedVars and savedVars.enabled then
+        OutputInfo("Duplicate detection active")
+    end
+
+    GSW.UpdateIndicator()
 end
 
 --------------------------------------------------------------------------------
@@ -246,21 +241,18 @@ local function OnCombatStateChanged(eventCode, inCombat)
 end
 
 local function OnPlayerActivated()
-    -- Check if we're in a trial zone
-    isInTrial = IsInTrialZone()
-    GSW.UpdateIndicator()
+    -- Check if we're in a trial zone or large group
+    CheckTrialStatus()
 end
 
 local function OnRaidMemberJoined()
     -- Recheck trial status when group changes
-    isInTrial = IsInTrialZone()
-    GSW.UpdateIndicator()
+    CheckTrialStatus()
 end
 
 local function OnRaidMemberLeft()
     -- Recheck trial status when group changes
-    isInTrial = IsInTrialZone()
-    GSW.UpdateIndicator()
+    CheckTrialStatus()
 end
 
 --------------------------------------------------------------------------------
@@ -270,9 +262,11 @@ end
 function GSW.OnIndicatorMoveStop()
     if not indicator or not savedVars then return end
 
-    local _, _, _, _, offsetX, offsetY = indicator:GetAnchor(0)
-    savedVars.indicatorX = offsetX
-    savedVars.indicatorY = offsetY
+    -- Save the top-left position relative to screen
+    local left = indicator:GetLeft()
+    local top = indicator:GetTop()
+    savedVars.indicatorX = left
+    savedVars.indicatorY = top
 end
 
 local function RestoreIndicatorPosition()
@@ -280,7 +274,7 @@ local function RestoreIndicatorPosition()
 
     if savedVars.indicatorX and savedVars.indicatorY then
         indicator:ClearAnchors()
-        indicator:SetAnchor(CENTER, GuiRoot, CENTER, savedVars.indicatorX, savedVars.indicatorY)
+        indicator:SetAnchor(TOPLEFT, GuiRoot, TOPLEFT, savedVars.indicatorX, savedVars.indicatorY)
     end
 end
 
@@ -336,6 +330,26 @@ local function HandleSlashCommand(args)
     else
         OutputInfo("Commands: /gsw [on|off|status|unlock|lock]")
     end
+end
+
+local function HandleTestCommand()
+    CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r === GSW Message Test ===")
+    CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r Group Setup Warnings loaded. Use /gsw for commands.")
+    CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r Duplicate detection active")
+    CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r Warnings enabled")
+    CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r Warnings disabled")
+    CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r Warnings: enabled | in trial")
+    CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r Warnings: disabled | not in trial")
+    CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r Indicator unlocked - drag to reposition")
+    CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r Indicator locked")
+    CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r Commands: /gsw [on|off|status|unlock|lock]")
+    CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate Enlivening Overflow (CP) detected: Player1, Player2")
+    CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate From the Brink (CP) detected: Player1, Player2")
+    CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate Major Courage (Buff) detected: Player1, Player2")
+    CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate Roaring Opportunist (Set) detected: Player1, Player2")
+    CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate Symphony of Blades (Set) detected: Player1, Player2")
+    CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate Ozezan's Inferno (Set) detected: Player1, Player2")
+    CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r === End Test ===")
 end
 
 --------------------------------------------------------------------------------
@@ -395,8 +409,9 @@ local function OnAddonLoaded(eventCode, addonName)
     -- Register events
     RegisterEvents()
 
-    -- Register slash command
+    -- Register slash commands
     SLASH_COMMANDS["/gsw"] = HandleSlashCommand
+    SLASH_COMMANDS["/gswtest"] = HandleTestCommand
 
     -- Initial trial state will be set on EVENT_PLAYER_ACTIVATED
     -- (IsUnitInRaid is not available at addon load time)

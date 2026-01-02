@@ -17,6 +17,7 @@ globals = {
     "EVENT_MANAGER",
     "WINDOW_MANAGER",
     "CHAT_SYSTEM",
+    "CHAT_ROUTER",
     "SLASH_COMMANDS",
     "GuiRoot",
 
@@ -37,12 +38,15 @@ globals = {
     "REGISTER_FILTER_ABILITY_ID",
     "REGISTER_FILTER_IS_ERROR",
     "CENTER",
+    "TOPLEFT",
 
     -- ESO Functions
+    "d",
     "IsUnitInRaid",
     "GetUnitTagById",
     "GetUnitName",
     "GetCurrentZoneId",
+    "GetGroupSize",
     "zo_strformat",
     "zo_callLater",
 
