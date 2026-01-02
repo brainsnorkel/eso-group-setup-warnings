@@ -92,10 +92,10 @@ end
 -- Utility Functions
 --------------------------------------------------------------------------------
 
-local function IsInLargeGroup()
-    -- Large group is more than a 4-person dungeon group (5-12 players)
+local function IsInGroup()
+    -- Any group (2+ players)
     if GetGroupSize then
-        return GetGroupSize() > 4
+        return GetGroupSize() >= 2
     end
     return false
 end
@@ -120,7 +120,7 @@ end
 
 local function CheckTrialStatus()
     local wasInTrial = isInTrial
-    isInTrial = IsInLargeGroup()
+    isInTrial = IsInGroup()
 
     -- Show activation message when entering trial state
     if isInTrial and not wasInTrial and savedVars and savedVars.enabled then
