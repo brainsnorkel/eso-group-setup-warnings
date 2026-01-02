@@ -121,9 +121,7 @@ GroupSetupWarnings/
 ├── GroupSetupWarnings.txt    # Manifest (required)
 ├── GroupSetupWarnings.lua    # Main addon code
 ├── GroupSetupWarnings.xml    # UI definitions (indicator)
-├── Settings.lua              # LAM settings panel
-└── libs/                     # Bundled libraries
-    └── LibAddonMenu-2.0/
+└── Settings.lua              # LAM settings panel
 ```
 
 ## Commands
@@ -175,7 +173,7 @@ ZO_SavedVars:NewAccountWide("GroupSetupWarningsSV", 1, nil, defaults)
 
 ## Common Libraries
 
-- **LibAddonMenu-2.0** — Settings menu (include in libs/)
+- **LibAddonMenu-2.0** — Settings menu (external dependency)
 - **LibDebugLogger** — Debug logging (optional)
 - **LibAsync** — Deferred actions
 
