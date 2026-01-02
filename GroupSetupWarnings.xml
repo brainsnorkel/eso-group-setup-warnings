@@ -1,7 +1,7 @@
-<![CDATA[<GuiXml>
+<GuiXml>
     <Controls>
         <TopLevelControl name="GroupSetupWarningsIndicator" mouseEnabled="true" movable="true" clampedToScreen="true" hidden="true">
-            <Dimensions x="60" y="24" />
+            <Dimensions x="100" y="24" />
             <Anchor point="CENTER" relativeTo="GuiRoot" relativePoint="CENTER" offsetX="0" offsetY="-200" />
 
             <OnMoveStop>
@@ -12,7 +12,9 @@
                 <!-- Background -->
                 <Backdrop name="$(parent)BG" inherits="ZO_DefaultBackdrop">
                     <AnchorFill />
-                    <Alpha alpha="0.7" />
+                    <OnInitialized>
+                        self:SetAlpha(0.7)
+                    </OnInitialized>
                 </Backdrop>
 
                 <!-- Text Label -->
@@ -35,4 +37,3 @@
         </TopLevelControl>
     </Controls>
 </GuiXml>
-]]>

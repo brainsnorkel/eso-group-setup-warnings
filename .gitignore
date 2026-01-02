@@ -1,0 +1,19 @@
+# Luacheck executable (installed in user Tools directory)
+luacheck.exe
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.log
+

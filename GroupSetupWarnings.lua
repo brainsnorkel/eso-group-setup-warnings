@@ -4,6 +4,7 @@
 GroupSetupWarnings = {}
 local GSW = GroupSetupWarnings
 
+-- Addon name is the folder name in ESO
 local ADDON_NAME = "GroupSetupWarnings"
 
 -- Ability IDs to track
@@ -25,6 +26,7 @@ local DEFAULT_SETTINGS = {
     indicatorY = nil,
     fontSize = 16,
     showAsIcon = false,
+    showInitMessage = true,  -- Show initialization message on load
     -- Detection rules
     enlivening = true,
     fromTheBrink = true,
@@ -46,9 +48,73 @@ local indicator = nil
 local indicatorLabel = nil
 local indicatorIcon = nil
 
+-- UpdateIndicator function - defined on GSW table for access from Settings.lua
+function GSW.UpdateIndicator()
+    if not indicator or not savedVars then return end
+
+    -- Show indicator if: (enabled AND in trial) OR (unlocked for repositioning)
+    local isActive = savedVars.enabled and isInTrial
+    local isUnlocked = not savedVars.indicatorLocked
+    local shouldShow = savedVars.showIndicator and (isActive or isUnlocked)
+
+    indicator:SetHidden(not shouldShow)
+
+    if shouldShow then
+        -- Update font size
+        local fontString = string.format("$(MEDIUM_FONT)|%d|soft-shadow-thin", savedVars.fontSize)
+        indicatorLabel:SetFont(fontString)
+
+        -- Toggle between icon and text mode
+        if savedVars.showAsIcon then
+            indicatorLabel:SetHidden(true)
+            indicatorIcon:SetHidden(false)
+        else
+            indicatorLabel:SetHidden(false)
+            indicatorIcon:SetHidden(true)
+            -- Show "Not in trial" when unlocked but not active
+            if isUnlocked and not isActive then
+                indicatorLabel:SetText("Not in trial")
+                indicatorLabel:SetColor(0.5, 0.5, 0.5, 1) -- Gray
+            else
+                indicatorLabel:SetText("GSW")
+                indicatorLabel:SetColor(0, 1, 0, 1) -- Green
+            end
+        end
+
+        -- Update movability
+        indicator:SetMovable(isUnlocked)
+        indicator:SetMouseEnabled(isUnlocked)
+    end
+end
+
 --------------------------------------------------------------------------------
 -- Utility Functions
 --------------------------------------------------------------------------------
+
+-- Trial zone IDs (12-player content)
+local TRIAL_ZONE_IDS = {
+    [636] = true,   -- Hel Ra Citadel
+    [638] = true,   -- Aetherian Archive
+    [639] = true,   -- Sanctum Ophidia
+    [725] = true,   -- Maw of Lorkhaj
+    [975] = true,   -- Halls of Fabrication
+    [1000] = true,  -- Asylum Sanctorium
+    [1051] = true,  -- Cloudrest
+    [1121] = true,  -- Sunspire
+    [1196] = true,  -- Kyne's Aegis
+    [1263] = true,  -- Rockgrove
+    [1344] = true,  -- Dreadsail Reef
+    [1427] = true,  -- Sanity's Edge
+    [1478] = true,  -- Lucent Citadel
+}
+
+local function IsInTrialZone()
+    if GetCurrentZoneId then
+        local zoneId = GetCurrentZoneId()
+        return TRIAL_ZONE_IDS[zoneId] == true
+    end
+    return false
+end
 
 local function GetPlayerNameFromUnitId(unitId)
     if unitId and unitId > 0 then
@@ -180,52 +246,26 @@ local function OnCombatStateChanged(eventCode, inCombat)
 end
 
 local function OnPlayerActivated()
-    -- Check if we're in a trial
-    isInTrial = IsUnitInRaid("player")
+    -- Check if we're in a trial zone
+    isInTrial = IsInTrialZone()
     GSW.UpdateIndicator()
 end
 
 local function OnRaidMemberJoined()
-    isInTrial = IsUnitInRaid("player")
+    -- Recheck trial status when group changes
+    isInTrial = IsInTrialZone()
     GSW.UpdateIndicator()
 end
 
 local function OnRaidMemberLeft()
-    isInTrial = IsUnitInRaid("player")
+    -- Recheck trial status when group changes
+    isInTrial = IsInTrialZone()
     GSW.UpdateIndicator()
 end
 
 --------------------------------------------------------------------------------
 -- UI Functions
 --------------------------------------------------------------------------------
-
-function GSW.UpdateIndicator()
-    if not indicator then return end
-
-    -- Show indicator only if enabled AND in a trial
-    local shouldShow = savedVars.enabled and savedVars.showIndicator and isInTrial
-
-    indicator:SetHidden(not shouldShow)
-
-    if shouldShow then
-        -- Update font size
-        local fontString = string.format("$(MEDIUM_FONT)|%d|soft-shadow-thin", savedVars.fontSize)
-        indicatorLabel:SetFont(fontString)
-
-        -- Toggle between icon and text mode
-        if savedVars.showAsIcon then
-            indicatorLabel:SetHidden(true)
-            indicatorIcon:SetHidden(false)
-        else
-            indicatorLabel:SetHidden(false)
-            indicatorIcon:SetHidden(true)
-        end
-
-        -- Update movability
-        indicator:SetMovable(not savedVars.indicatorLocked)
-        indicator:SetMouseEnabled(not savedVars.indicatorLocked)
-    end
-end
 
 function GSW.OnIndicatorMoveStop()
     if not indicator or not savedVars then return end
@@ -344,6 +384,11 @@ local function OnAddonLoaded(eventCode, addonName)
     savedVars = ZO_SavedVars:NewAccountWide("GroupSetupWarningsSV", 1, nil, DEFAULT_SETTINGS)
     GSW.savedVars = savedVars
 
+    -- Show initialization message if enabled
+    if savedVars.showInitMessage then
+        OutputInfo("Group Setup Warnings loaded. Use /gsw for commands.")
+    end
+
     -- Initialize UI
     InitializeUI()
 
@@ -353,9 +398,8 @@ local function OnAddonLoaded(eventCode, addonName)
     -- Register slash command
     SLASH_COMMANDS["/gsw"] = HandleSlashCommand
 
-    -- Check initial trial state
-    isInTrial = IsUnitInRaid("player")
-    GSW.UpdateIndicator()
+    -- Initial trial state will be set on EVENT_PLAYER_ACTIVATED
+    -- (IsUnitInRaid is not available at addon load time)
 end
 
 EVENT_MANAGER:RegisterForEvent(ADDON_NAME, EVENT_ADD_ON_LOADED, OnAddonLoaded)

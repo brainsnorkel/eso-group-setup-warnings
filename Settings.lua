@@ -2,10 +2,6 @@
 -- Requires LibAddonMenu-2.0
 
 local GSW = GroupSetupWarnings
-local LAM = LibAddonMenu2
-
--- Only initialize if LAM is available
-if not LAM then return end
 
 local panelData = {
     type = "panel",
@@ -20,6 +16,9 @@ local panelData = {
 
 local function CreateOptionsTable()
     local savedVars = GSW.savedVars
+    if not savedVars then
+        return {}
+    end
 
     local optionsTable = {
         -- General Settings Header
@@ -35,7 +34,9 @@ local function CreateOptionsTable()
             getFunc = function() return savedVars.enabled end,
             setFunc = function(value)
                 savedVars.enabled = value
-                GSW.UpdateIndicator()
+                if GSW.UpdateIndicator then
+                    GSW.UpdateIndicator()
+                end
             end,
             width = "full",
             default = true,
@@ -47,7 +48,9 @@ local function CreateOptionsTable()
             getFunc = function() return savedVars.showIndicator end,
             setFunc = function(value)
                 savedVars.showIndicator = value
-                GSW.UpdateIndicator()
+                if GSW.UpdateIndicator then
+                    GSW.UpdateIndicator()
+                end
             end,
             width = "full",
             default = true,
@@ -59,8 +62,19 @@ local function CreateOptionsTable()
             getFunc = function() return savedVars.indicatorLocked end,
             setFunc = function(value)
                 savedVars.indicatorLocked = value
-                GSW.UpdateIndicator()
+                if GSW.UpdateIndicator then
+                    GSW.UpdateIndicator()
+                end
             end,
+            width = "full",
+            default = true,
+        },
+        {
+            type = "checkbox",
+            name = "Show Initialization Message",
+            tooltip = "Show a chat message when the addon loads",
+            getFunc = function() return savedVars.showInitMessage end,
+            setFunc = function(value) savedVars.showInitMessage = value end,
             width = "full",
             default = true,
         },
@@ -81,7 +95,9 @@ local function CreateOptionsTable()
             getFunc = function() return savedVars.fontSize end,
             setFunc = function(value)
                 savedVars.fontSize = value
-                GSW.UpdateIndicator()
+                if GSW.UpdateIndicator then
+                    GSW.UpdateIndicator()
+                end
             end,
             width = "full",
             default = 16,
@@ -93,7 +109,9 @@ local function CreateOptionsTable()
             getFunc = function() return savedVars.showAsIcon end,
             setFunc = function(value)
                 savedVars.showAsIcon = value
-                GSW.UpdateIndicator()
+                if GSW.UpdateIndicator then
+                    GSW.UpdateIndicator()
+                end
             end,
             width = "full",
             default = false,
@@ -169,16 +187,80 @@ local function CreateOptionsTable()
     return optionsTable
 end
 
+local settingsInitialized = false
+
 local function InitializeSettings()
+    -- Prevent duplicate registration
+    if settingsInitialized then
+        return
+    end
+
+    local LAM = LibAddonMenu2
+    if not LAM then
+        return
+    end
+
+    if not GSW.savedVars then
+        -- Wait a bit more for savedVars to be ready
+        zo_callLater(InitializeSettings, 100)
+        return
+    end
+
     local panel = LAM:RegisterAddonPanel("GroupSetupWarningsOptions", panelData)
-    LAM:RegisterOptionControls("GroupSetupWarningsOptions", CreateOptionsTable())
+    if panel then
+        LAM:RegisterOptionControls("GroupSetupWarningsOptions", CreateOptionsTable())
+        settingsInitialized = true
+    end
 end
 
--- Wait for addon to fully load before initializing settings
-local function OnPlayerActivated()
-    EVENT_MANAGER:UnregisterForEvent("GSW_Settings", EVENT_PLAYER_ACTIVATED)
-    -- Small delay to ensure savedVars is ready
-    zo_callLater(InitializeSettings, 500)
+-- Wait for addon to load and LibAddonMenu-2.0 to be available
+local function TryInitializeSettings()
+    -- Check if LibAddonMenu-2.0 is available
+    if not LibAddonMenu2 then
+        return false
+    end
+
+    -- Check if main addon is loaded and savedVars is initialized
+    if not GSW or not GSW.savedVars then
+        return false
+    end
+
+    InitializeSettings()
+    return true
 end
 
-EVENT_MANAGER:RegisterForEvent("GSW_Settings", EVENT_PLAYER_ACTIVATED, OnPlayerActivated)
+-- Try to initialize when LibAddonMenu-2.0 loads
+local function OnLibAddonMenuLoaded(eventCode, addonName)
+    if addonName == "LibAddonMenu-2.0" then
+        EVENT_MANAGER:UnregisterForEvent("GSW_Settings_LAM", EVENT_ADD_ON_LOADED)
+        -- Try to initialize, retry if not ready
+        if not TryInitializeSettings() then
+            zo_callLater(function()
+                if not TryInitializeSettings() then
+                    -- Retry one more time after a longer delay
+                    zo_callLater(TryInitializeSettings, 500)
+                end
+            end, 100)
+        end
+    end
+end
+
+-- Also try when our addon loads
+local function OnAddonLoaded(eventCode, addonName)
+    -- Check for both possible addon names (folder name vs internal name)
+    if addonName == "GroupSetupWarnings" or addonName == "eso-group-setup-warnings" then
+        EVENT_MANAGER:UnregisterForEvent("GSW_Settings", EVENT_ADD_ON_LOADED)
+        -- Try to initialize, retry if not ready
+        if not TryInitializeSettings() then
+            zo_callLater(function()
+                if not TryInitializeSettings() then
+                    -- Retry one more time after a longer delay
+                    zo_callLater(TryInitializeSettings, 500)
+                end
+            end, 100)
+        end
+    end
+end
+
+EVENT_MANAGER:RegisterForEvent("GSW_Settings", EVENT_ADD_ON_LOADED, OnAddonLoaded)
+EVENT_MANAGER:RegisterForEvent("GSW_Settings_LAM", EVENT_ADD_ON_LOADED, OnLibAddonMenuLoaded)

@@ -127,8 +127,11 @@ GroupSetupWarnings/
 ## Commands
 
 ```bash
-# Lint
-luacheck . --config .luacheckrc
+# Lint (luacheck is installed at C:\Users\Nebula PC\Tools\luacheck.exe)
+luacheck.exe --config .luacheckrc GroupSetupWarnings.lua Settings.lua
+
+# Or from any directory (if PATH is set):
+luacheck --config .luacheckrc GroupSetupWarnings.lua Settings.lua
 
 # Create release ZIP (excludes dev files)
 zip -r GroupSetupWarnings.zip GroupSetupWarnings -x "*.git*" -x "*.md" -x ".luacheckrc"
@@ -190,9 +193,17 @@ Create `.github/workflows/release.yml` for automated ESOUI publishing on tagged 
 
 ## Luacheck
 
+### Installation Location
+- **Path**: `C:\Users\Nebula PC\Tools\luacheck.exe`
+- **Version**: 0.23.0
+- **Status**: Installed and added to user PATH
+- **Usage**: `luacheck.exe --config .luacheckrc GroupSetupWarnings.lua Settings.lua`
+
+### Configuration
 Use `.luacheckrc` in repo root with:
 - `std = "lua51"`
 - ESO globals: `EVENT_MANAGER`, `ZO_SavedVars`, `GetGroupSize`, etc.
+- `unused_args = false` (ESO event handlers have many unused parameters)
 - Exclude `libs/*`
 
 ## Best Practices

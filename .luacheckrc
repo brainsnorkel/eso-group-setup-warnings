@@ -42,6 +42,7 @@ globals = {
     "IsUnitInRaid",
     "GetUnitTagById",
     "GetUnitName",
+    "GetCurrentZoneId",
     "zo_strformat",
     "zo_callLater",
 
@@ -65,3 +66,6 @@ max_line_length = 120
 
 -- Ignore unused self parameter (common in ESO callbacks)
 self = false
+
+-- Ignore unused arguments (common in ESO event handlers)
+unused_args = false
