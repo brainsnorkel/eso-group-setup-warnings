@@ -1,0 +1,11 @@
+## Title: Group Setup Warnings
+## Description: Alerts when Champion Points and healing sets are duplicated in trials
+## Author: brainsnorkel
+## Version: 1.0.0
+## APIVersion: 101044
+## SavedVariables: GroupSetupWarningsSV
+## OptionalDependsOn: LibAddonMenu-2.0 LibDebugLogger
+
+GroupSetupWarnings.xml
+GroupSetupWarnings.lua
+Settings.lua
