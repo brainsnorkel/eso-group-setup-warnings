@@ -1,0 +1,38 @@
+<![CDATA[<GuiXml>
+    <Controls>
+        <TopLevelControl name="GroupSetupWarningsIndicator" mouseEnabled="true" movable="true" clampedToScreen="true" hidden="true">
+            <Dimensions x="60" y="24" />
+            <Anchor point="CENTER" relativeTo="GuiRoot" relativePoint="CENTER" offsetX="0" offsetY="-200" />
+
+            <OnMoveStop>
+                GroupSetupWarnings.OnIndicatorMoveStop()
+            </OnMoveStop>
+
+            <Controls>
+                <!-- Background -->
+                <Backdrop name="$(parent)BG" inherits="ZO_DefaultBackdrop">
+                    <AnchorFill />
+                    <Alpha alpha="0.7" />
+                </Backdrop>
+
+                <!-- Text Label -->
+                <Label name="$(parent)Label" font="ZoFontGameSmall" color="00FF00" horizontalAlignment="CENTER" verticalAlignment="CENTER">
+                    <AnchorFill />
+                    <OnInitialized>
+                        self:SetText("GSW")
+                    </OnInitialized>
+                </Label>
+
+                <!-- Icon (hidden by default, shown when icon mode enabled) -->
+                <Texture name="$(parent)Icon" hidden="true">
+                    <Dimensions x="20" y="20" />
+                    <Anchor point="CENTER" relativeTo="$(parent)" relativePoint="CENTER" />
+                    <OnInitialized>
+                        self:SetTexture("/esoui/art/icons/ability_buff_major_resolve.dds")
+                    </OnInitialized>
+                </Texture>
+            </Controls>
+        </TopLevelControl>
+    </Controls>
+</GuiXml>
+]]>
