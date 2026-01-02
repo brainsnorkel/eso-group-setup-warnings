@@ -8,12 +8,17 @@ local GSW = GroupSetupWarnings
 local ADDON_NAME = "GroupSetupWarnings"
 
 -- Ability IDs to track
+-- useTarget = true means use the heal/buff target as the owner (for procs triggered by enemies)
 local TRACKED_ABILITIES = {
     [156008] = { name = "Enlivening Overflow", type = "CP", settingKey = "enlivening" },
-    [156019] = { name = "From the Brink", type = "CP", settingKey = "fromTheBrink" },
+    [156012] = { name = "Enlivening Overflow", type = "CP", settingKey = "enlivening" },  -- Alternate ID
+    [156019] = { name = "From the Brink", type = "CP", settingKey = "fromTheBrink", useTarget = true },
+    [156020] = { name = "From the Brink", type = "CP", settingKey = "fromTheBrink", useTarget = true },  -- Alternate ID
     [66902]  = { name = "Major Courage", type = "Buff", settingKey = "majorCourage" },
+    [109966] = { name = "Major Courage", type = "Buff", settingKey = "majorCourage" },  -- Alternate ID (Olorime/etc)
     [135920] = { name = "Roaring Opportunist", type = "Set", settingKey = "roaringOpportunist" },
     [117110] = { name = "Symphony of Blades", type = "Set", settingKey = "symphonyOfBlades" },
+    [117111] = { name = "Symphony of Blades", type = "Set", settingKey = "symphonyOfBlades", useTarget = true },  -- Meridia's Favor buff (target receives)
     [188456] = { name = "Ozezan's Inferno", type = "Set", settingKey = "ozezanInferno" },
 }
 
@@ -27,6 +32,7 @@ local DEFAULT_SETTINGS = {
     fontSize = 16,
     showAsIcon = false,
     showInitMessage = true,  -- Show initialization message on load
+    debugMode = false,       -- Show individual detections
     -- Detection rules
     enlivening = true,
     fromTheBrink = true,
@@ -101,30 +107,49 @@ local function IsInGroup()
 end
 
 local function GetPlayerNameFromUnitId(unitId)
-    if unitId and unitId > 0 then
-        local unitTag = GetUnitTagById(unitId)
+    if unitId and unitId > 0 and GetUnitTagByUnitId then
+        local unitTag = GetUnitTagByUnitId(unitId)
         if unitTag and unitTag ~= "" then
-            return GetUnitName(unitTag)
+            local name = GetUnitName(unitTag)
+            -- Strip gender markers (^Fx, ^Mx) from name
+            return zo_strformat("<<1>>", name)
         end
     end
     return nil
 end
 
+-- Logger (optional LibDebugLogger support)
+local logger = nil
+
 local function OutputWarning(message)
     CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r " .. message)
+    if logger then logger:Warn(message) end
 end
 
 local function OutputInfo(message)
     CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r " .. message)
+    if logger then logger:Info(message) end
+end
+
+local function OutputDebug(message)
+    if savedVars and savedVars.debugMode then
+        CHAT_ROUTER:AddSystemMessage("|c888888[GSW Debug]|r " .. message)
+    end
+    if logger then logger:Debug(message) end
 end
 
 local function CheckTrialStatus()
     local wasInTrial = isInTrial
     isInTrial = IsInGroup()
 
-    -- Show activation message when entering trial state
-    if isInTrial and not wasInTrial and savedVars and savedVars.enabled then
-        OutputInfo("Duplicate detection active")
+    if savedVars and savedVars.enabled then
+        -- Show activation message when entering group
+        if isInTrial and not wasInTrial then
+            OutputInfo("Duplicate detection active")
+        -- Show deactivation message when leaving group
+        elseif wasInTrial and not isInTrial then
+            OutputInfo("Duplicate detection inactive")
+        end
     end
 
     GSW.UpdateIndicator()
@@ -169,6 +194,8 @@ local function RecordAbilityUse(abilityId, playerName)
     -- Record this player using the ability (if not already recorded)
     if not fightDetections[abilityId][playerName] then
         fightDetections[abilityId][playerName] = true
+        local abilityInfo = TRACKED_ABILITIES[abilityId]
+        OutputDebug(string.format("%s detected: %s", abilityInfo.name, playerName))
         CheckForDuplicates(abilityId)
     end
 end
@@ -181,50 +208,31 @@ local function OnCombatEvent(eventCode, result, isError, abilityName, abilityGra
     abilityActionSlotType, sourceName, sourceType, targetName, targetType,
     hitValue, powerType, damageType, log, sourceUnitId, targetUnitId, abilityId)
 
-    -- Only process if enabled and in trial
-    if not savedVars.enabled or not isInTrial then return end
-
     -- Check if this ability is tracked
     local abilityInfo = TRACKED_ABILITIES[abilityId]
     if not abilityInfo then return end
 
-    -- Check if this specific rule is enabled
-    if not savedVars[abilityInfo.settingKey] then return end
-
-    -- Get player name from source
-    local playerName = GetPlayerNameFromUnitId(sourceUnitId)
-    if not playerName then
-        -- Fallback to sourceName if available
-        playerName = zo_strformat("<<1>>", sourceName)
-    end
-
-    if playerName and playerName ~= "" then
-        RecordAbilityUse(abilityId, playerName)
-    end
-end
-
-local function OnEffectChanged(eventCode, changeType, effectSlot, effectName,
-    unitTag, beginTime, endTime, stackCount, iconName, buffType, effectType,
-    abilityType, statusEffectType, unitName, unitId, abilityId, sourceType)
-
-    -- Only process buff gains
-    if changeType ~= EFFECT_RESULT_GAINED then return end
-
-    -- Only process if enabled and in trial
+    -- Only process if enabled and in group
     if not savedVars.enabled or not isInTrial then return end
 
-    -- Check if this ability is tracked
-    local abilityInfo = TRACKED_ABILITIES[abilityId]
-    if not abilityInfo then return end
-
     -- Check if this specific rule is enabled
     if not savedVars[abilityInfo.settingKey] then return end
 
-    -- For effect changed, we need to determine who applied the buff
-    -- The unitTag is who received the buff, but we want who applied it
-    -- Unfortunately, EVENT_EFFECT_CHANGED doesn't always give us the source
-    -- We'll use this primarily as a backup detection method
-    local playerName = zo_strformat("<<1>>", unitName)
+    -- Determine which unit to attribute this to
+    -- useTarget: For procs like From the Brink where the target of the heal is the CP owner
+    local playerName
+    if abilityInfo.useTarget then
+        playerName = GetPlayerNameFromUnitId(targetUnitId)
+        if not playerName then
+            playerName = zo_strformat("<<1>>", targetName)
+        end
+    else
+        playerName = GetPlayerNameFromUnitId(sourceUnitId)
+        if not playerName then
+            playerName = zo_strformat("<<1>>", sourceName)
+        end
+    end
+
     if playerName and playerName ~= "" then
         RecordAbilityUse(abilityId, playerName)
     end
@@ -252,6 +260,11 @@ end
 
 local function OnRaidMemberLeft()
     -- Recheck trial status when group changes
+    CheckTrialStatus()
+end
+
+local function OnGroupMemberLeft()
+    -- Recheck status when regular group member leaves (including self)
     CheckTrialStatus()
 end
 
@@ -327,8 +340,13 @@ local function HandleSlashCommand(args)
         OutputInfo("Indicator locked")
         GSW.UpdateIndicator()
 
+    elseif command == "debug" then
+        savedVars.debugMode = not savedVars.debugMode
+        local status = savedVars.debugMode and "enabled" or "disabled"
+        OutputInfo("Debug mode " .. status)
+
     else
-        OutputInfo("Commands: /gsw [on|off|status|unlock|lock]")
+        OutputInfo("Commands: /gsw [on|off|status|unlock|lock|debug]")
     end
 end
 
@@ -368,13 +386,10 @@ local function RegisterEvents()
             REGISTER_FILTER_IS_ERROR, false)
     end
 
-    -- Effect changed events for buff detection
-    for abilityId in pairs(TRACKED_ABILITIES) do
-        local eventName = ADDON_NAME .. "_Effect_" .. abilityId
-        em:RegisterForEvent(eventName, EVENT_EFFECT_CHANGED, OnEffectChanged)
-        em:AddFilterForEvent(eventName, EVENT_EFFECT_CHANGED,
-            REGISTER_FILTER_ABILITY_ID, abilityId)
-    end
+    -- NOTE: EVENT_EFFECT_CHANGED is disabled because it only tells us who
+    -- RECEIVED the buff, not who applied it. This causes false positives
+    -- (e.g., companions being detected as wearing Symphony of Blades).
+    -- EVENT_COMBAT_EVENT correctly identifies the source player.
 
     -- Combat state tracking
     em:RegisterForEvent(ADDON_NAME, EVENT_PLAYER_COMBAT_STATE, OnCombatStateChanged)
@@ -382,7 +397,8 @@ local function RegisterEvents()
     -- Zone/trial detection
     em:RegisterForEvent(ADDON_NAME, EVENT_PLAYER_ACTIVATED, OnPlayerActivated)
     em:RegisterForEvent(ADDON_NAME, EVENT_RAID_MEMBER_JOINED, OnRaidMemberJoined)
-    em:RegisterForEvent(ADDON_NAME .. "_Left", EVENT_RAID_MEMBER_LEFT, OnRaidMemberLeft)
+    em:RegisterForEvent(ADDON_NAME .. "_RaidLeft", EVENT_RAID_MEMBER_LEFT, OnRaidMemberLeft)
+    em:RegisterForEvent(ADDON_NAME .. "_GroupLeft", EVENT_GROUP_MEMBER_LEFT, OnGroupMemberLeft)
 end
 
 --------------------------------------------------------------------------------
@@ -393,6 +409,11 @@ local function OnAddonLoaded(eventCode, addonName)
     if addonName ~= ADDON_NAME then return end
 
     EVENT_MANAGER:UnregisterForEvent(ADDON_NAME, EVENT_ADD_ON_LOADED)
+
+    -- Initialize logger if LibDebugLogger is available
+    if LibDebugLogger then
+        logger = LibDebugLogger(ADDON_NAME)
+    end
 
     -- Initialize saved variables
     savedVars = ZO_SavedVars:NewAccountWide("GroupSetupWarningsSV", 1, nil, DEFAULT_SETTINGS)

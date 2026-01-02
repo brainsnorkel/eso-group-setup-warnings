@@ -32,6 +32,7 @@ globals = {
     "EVENT_EFFECT_CHANGED",
     "EVENT_RAID_MEMBER_JOINED",
     "EVENT_RAID_MEMBER_LEFT",
+    "EVENT_GROUP_MEMBER_LEFT",
 
     -- ESO Combat/Effect constants
     "EFFECT_RESULT_GAINED",
@@ -44,6 +45,7 @@ globals = {
     "d",
     "IsUnitInRaid",
     "GetUnitTagById",
+    "GetUnitTagByUnitId",
     "GetUnitName",
     "GetCurrentZoneId",
     "GetGroupSize",
@@ -52,6 +54,7 @@ globals = {
 
     -- Libraries
     "LibAddonMenu2",
+    "LibDebugLogger",
 }
 
 -- Read-only globals (don't warn about accessing these)
