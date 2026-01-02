@@ -17,6 +17,17 @@ Detect duplicate buffs/sets in **trials** during combat and warn the player. Spe
 
 When 2+ players trigger the same ability/buff in the same fight, display a chat warning listing who has duplicates.
 
+### Trial-Only Activation
+
+The addon only activates detection when `IsUnitInRaid("player")` returns true (player is in a trial).
+
+### On-Screen Status Indicator
+
+A movable UI element shows:
+- **Active state**: Icon or text indicating addon is monitoring (e.g., "GSW: Active" or eye icon)
+- **Rules enabled**: Which detection rules are currently on (abbreviated, e.g., "EO FB MC RO SB OI")
+- **Hidden when inactive**: Only visible in trials (or always visible per setting)
+
 ### Slash Commands
 
 | Command | Description |
@@ -25,6 +36,35 @@ When 2+ players trigger the same ability/buff in the same fight, display a chat 
 | `/gsw on` | Enable all warnings |
 | `/gsw off` | Disable all warnings |
 | `/gsw status` | Show current warning state |
+| `/gsw unlock` | Unlock indicator for repositioning |
+| `/gsw lock` | Lock indicator position |
+
+## Settings Panel (LibAddonMenu-2.0)
+
+### General Settings
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| Enable Addon | Checkbox | On | Master on/off toggle |
+| Show Status Indicator | Checkbox | On | Show/hide on-screen indicator |
+| Indicator Locked | Checkbox | On | Lock indicator position |
+| Show Only In Trials | Checkbox | On | Hide indicator outside trials |
+
+### Indicator Appearance
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| Font Size | Slider | 16 | Text size (12-24) |
+| Show As Icon | Checkbox | Off | Use icon instead of text |
+| Show Active Rules | Checkbox | On | Display which rules are enabled |
+
+### Detection Rules (Individual Toggles)
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| Enlivening Overflow | Checkbox | On | Detect duplicate CP |
+| From the Brink | Checkbox | On | Detect duplicate CP |
+| Major Courage | Checkbox | On | Detect duplicate buff |
+| Roaring Opportunist | Checkbox | On | Detect duplicate set |
+| Symphony of Blades | Checkbox | On | Detect duplicate set |
+| Ozezan's Inferno | Checkbox | On | Detect duplicate set |
 
 ## Feasibility Analysis
 
@@ -37,10 +77,19 @@ When 2+ players trigger the same ability/buff in the same fight, display a chat 
 - `IsUnitInRaid("player")` — Check if in trial/raid
 - `IsUnitInCombat("player")` — Check combat state
 
+**UI APIs (for status indicator):**
+- `WINDOW_MANAGER:CreateTopLevelWindow()` — Create movable window
+- `CreateControlFromVirtual()` — Create controls from XML templates
+- `SetMovable(true/false)` — Enable/disable dragging
+- `SetMouseEnabled(true/false)` — Enable mouse interaction
+- `SetFont("ZoFontGame")` — Set text font/size
+- `SetHidden(true/false)` — Show/hide control
+
 **Limitations:**
 - Can only see combat events for players within render distance (~100m)
 - Cannot directly query what CP abilities other players have slotted (must wait for proc)
 - Detection is reactive (see ability when it fires, not when equipped)
+- UI position must be saved in SavedVariables to persist across sessions
 
 ### Implementation Strategy
 
@@ -52,6 +101,11 @@ When 2+ players trigger the same ability/buff in the same fight, display a chat 
 4. **Duplicate Tracking**: Maintain per-fight table of `{abilityId = {playerName1, playerName2, ...}}`
 5. **Warning Output**: Use `d()` or `CHAT_SYSTEM:AddMessage()` for warnings
 6. **Fight Reset**: Clear tracking tables when combat ends
+7. **Status Indicator UI**:
+   - Define in XML with TopLevelControl, label, and optional icon texture
+   - Register `OnMoveStop` handler to save position to SavedVariables
+   - Update visibility on zone change (`EVENT_PLAYER_ACTIVATED`)
+   - Refresh text when rules are toggled in settings
 
 ### Key Combat Event Filter
 
@@ -69,8 +123,10 @@ Multiple filters can be registered with unique namespaces for each ability ID.
 GroupSetupWarnings/
 ├── GroupSetupWarnings.txt    # Manifest (required)
 ├── GroupSetupWarnings.lua    # Main addon code
-├── Settings.lua              # LAM settings panel (optional)
+├── GroupSetupWarnings.xml    # UI definitions (indicator)
+├── Settings.lua              # LAM settings panel
 └── libs/                     # Bundled libraries
+    └── LibAddonMenu-2.0/
 ```
 
 ## Commands
