@@ -2,6 +2,67 @@
 
 Addon that alerts when Champion Points or healing sets are unusual in ESO dungeons and trials.
 
+## Addon Goals
+
+Detect duplicate buffs/sets in **trials** during combat and warn the player. Specifically:
+
+| Type | Name | Ability/Buff ID | Detection Method |
+|------|------|-----------------|------------------|
+| CP | Enlivening Overflow | 156008 | Combat event when CP procs |
+| CP | From the Brink | 156019 | Combat event when heal triggers |
+| Buff | Major Courage | 66902 | Effect applied event |
+| Set | Roaring Opportunist | 135920 | Effect applied event |
+| Set | Symphony of Blades | 117110 | Combat event when proc triggers |
+| Set | Ozezan's Inferno | 188456 | Combat event when proc triggers |
+
+When 2+ players trigger the same ability/buff in the same fight, display a chat warning listing who has duplicates.
+
+### Slash Commands
+
+| Command | Description |
+|---------|-------------|
+| `/gsw` | Toggle all warnings on/off |
+| `/gsw on` | Enable all warnings |
+| `/gsw off` | Disable all warnings |
+| `/gsw status` | Show current warning state |
+
+## Feasibility Analysis
+
+### What ESO APIs Allow
+
+**Can detect (via combat log):**
+- `EVENT_COMBAT_EVENT` — Fires for damage, healing, and buff applications. Provides `sourceUnitId`, `abilityId`, etc.
+- `EVENT_EFFECT_CHANGED` — Fires when buffs are applied/removed. Provides `unitTag`, `effectSlot`, `abilityId`, etc.
+- `GetUnitName(unitTag)` — Get player name from unit tag
+- `IsUnitInRaid("player")` — Check if in trial/raid
+- `IsUnitInCombat("player")` — Check combat state
+
+**Limitations:**
+- Can only see combat events for players within render distance (~100m)
+- Cannot directly query what CP abilities other players have slotted (must wait for proc)
+- Detection is reactive (see ability when it fires, not when equipped)
+
+### Implementation Strategy
+
+1. **Trial Detection**: Use `IsUnitInRaid("player")` or check zone IDs for trial zones
+2. **Combat Tracking**: Register for `EVENT_PLAYER_COMBAT_STATE` to track fight boundaries
+3. **Ability Detection**:
+   - Hook `EVENT_COMBAT_EVENT` with filter for target ability IDs
+   - Hook `EVENT_EFFECT_CHANGED` for buff applications
+4. **Duplicate Tracking**: Maintain per-fight table of `{abilityId = {playerName1, playerName2, ...}}`
+5. **Warning Output**: Use `d()` or `CHAT_SYSTEM:AddMessage()` for warnings
+6. **Fight Reset**: Clear tracking tables when combat ends
+
+### Key Combat Event Filter
+
+```lua
+EVENT_MANAGER:RegisterForEvent(addon, EVENT_COMBAT_EVENT, OnCombatEvent)
+EVENT_MANAGER:AddFilterForEvent(addon, EVENT_COMBAT_EVENT,
+    REGISTER_FILTER_ABILITY_ID, abilityId)
+```
+
+Multiple filters can be registered with unique namespaces for each ability ID.
+
 ## Project Structure
 
 ```
