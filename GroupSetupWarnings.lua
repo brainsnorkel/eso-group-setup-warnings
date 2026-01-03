@@ -19,10 +19,12 @@ local TRACKED_ABILITIES = {
     [117110] = { name = "Symphony of Blades", type = "Set", settingKey = "symphonyOfBlades" },
     [117111] = { name = "Symphony of Blades", type = "Set", settingKey = "symphonyOfBlades" },  -- Meridia's Favor buff
     [188456] = { name = "Ozezan's Inferno", type = "Set", settingKey = "ozezanInferno" },
+    [61771]  = { name = "Powerful Assault", type = "Set", settingKey = "powerfulAssault" },
+    [61763]  = { name = "Powerful Assault", type = "Set", settingKey = "powerfulAssault" },  -- Alternate ID
 }
 
 -- Addon version (keep in sync with manifest)
-GSW.version = "1.5.0"
+GSW.version = "1.7.0"
 
 -- Default settings
 local DEFAULT_SETTINGS = {
@@ -34,21 +36,35 @@ local DEFAULT_SETTINGS = {
     fontSize = 16,
     showInitMessage = true,  -- Show initialization message on load
     debugMode = false,       -- Show individual detections
-    warnMissingCourage = true,  -- Warn if no Major Courage in fight
-    warnMissingEnlivening = true,  -- Warn if no Enlivening Overflow in fight
-    warnMissingFrostCloak = true,  -- Warn if no Frost Cloak in fight
-    -- Detection rules (duplicate detection)
-    enlivening = true,
-    majorCourage = true,
-    frostCloak = true,  -- Track Frost Cloak for missing buff warning
-    symphonyOfBlades = true,
-    ozezanInferno = true,
+    -- Missing buff warnings: Small (2-4) and Large (5+) toggles
+    -- If both are off, warning is disabled for that buff
+    warnMissingCourageSmall = false,
+    warnMissingCourageLarge = true,
+    warnMissingEnliveningSmall = false,
+    warnMissingEnliveningLarge = true,
+    warnMissingFrostCloakSmall = false,
+    warnMissingFrostCloakLarge = true,
+    -- Duplicate detection: Small (2-4) and Large (5+) toggles
+    -- If both are off, detection is disabled for that ability
+    enliveningSmall = true,
+    enliveningLarge = true,
+    majorCourageSmall = true,
+    majorCourageLarge = true,
+    frostCloakSmall = false,  -- Off for small groups by default
+    frostCloakLarge = true,
+    symphonyOfBladesSmall = true,
+    symphonyOfBladesLarge = true,
+    ozezanInfernoSmall = true,
+    ozezanInfernoLarge = true,
+    powerfulAssaultSmall = true,
+    powerfulAssaultLarge = true,
 }
 
 -- State
 local savedVars = nil
 local isInTrial = false
 local isInCombat = false
+local isPaused = false  -- Temporary pause (resets on zone change)
 local fightDetections = {} -- { abilityId = { playerName = true, ... }, ... }
 local warnedThisFight = {} -- { abilityId = true, ... }
 local combatStartTime = 0  -- When combat started (for minimum fight duration check)
@@ -61,11 +77,9 @@ local indicatorLabel = nil
 function GSW.UpdateIndicator()
     if not indicator or not savedVars then return end
 
-    -- Show indicator if: (enabled AND in trial) OR (unlocked for repositioning)
-    local isActive = savedVars.enabled and isInTrial
     local isUnlocked = not savedVars.indicatorLocked
-    -- Always show when unlocked (for repositioning), otherwise only when active
-    local shouldShow = isUnlocked or (savedVars.showIndicator and isActive)
+    -- Show indicator if: (enabled AND in trial) OR (unlocked for repositioning) OR paused
+    local shouldShow = isUnlocked or isPaused or (savedVars.showIndicator and savedVars.enabled and isInTrial)
 
     indicator:SetHidden(not shouldShow)
 
@@ -74,18 +88,25 @@ function GSW.UpdateIndicator()
         local fontString = string.format("$(MEDIUM_FONT)|%d|soft-shadow-thin", savedVars.fontSize)
         indicatorLabel:SetFont(fontString)
 
-        -- Show "Not in trial" when unlocked but not active
-        if isUnlocked and not isActive then
-            indicatorLabel:SetText("Not in trial")
+        -- Show "GSW not active" when unlocked but not active
+        if isUnlocked and not savedVars.enabled then
+            indicatorLabel:SetText("GSW not active")
+            indicatorLabel:SetColor(0.5, 0.5, 0.5, 1) -- Gray
+        elseif isPaused then
+            indicatorLabel:SetText("GSW (Paused)")
+            indicatorLabel:SetColor(1, 0.5, 0, 1) -- Orange
+        elseif isUnlocked and not isInTrial then
+            indicatorLabel:SetText("GSW not active")
             indicatorLabel:SetColor(0.5, 0.5, 0.5, 1) -- Gray
         else
             indicatorLabel:SetText("GSW")
             indicatorLabel:SetColor(0, 1, 0, 1) -- Green
         end
 
-        -- Update movability
+        -- Update movability - allow mouse interaction when unlocked OR when clickable for pause toggle
         indicator:SetMovable(isUnlocked)
-        indicator:SetMouseEnabled(isUnlocked)
+        -- Always enable mouse for click-to-pause when in trial
+        indicator:SetMouseEnabled(isUnlocked or isInTrial)
     end
 end
 
@@ -93,12 +114,43 @@ end
 -- Utility Functions
 --------------------------------------------------------------------------------
 
-local function IsInGroup()
-    -- Any group (2+ players)
-    if GetGroupSize then
-        return GetGroupSize() >= 2
+-- Returns current group size category: "none", "small" (2-4), or "large" (5+)
+local function GetGroupSizeCategory()
+    if not GetGroupSize then return "none" end
+
+    local groupSize = GetGroupSize()
+    if groupSize >= 5 then
+        return "large"
+    elseif groupSize >= 2 then
+        return "small"
+    else
+        return "none"
     end
-    return false
+end
+
+-- Expose for external use
+GSW.GetGroupSizeCategory = GetGroupSizeCategory
+
+local function IsInGroup()
+    return GetGroupSizeCategory() ~= "none"
+end
+
+-- Check if a detection rule is enabled for the current group size
+-- settingKey: base setting name (e.g., "enlivening", "majorCourage")
+local function IsDetectionEnabledForGroupSize(settingKey)
+    if not savedVars then return false end
+
+    local category = GetGroupSizeCategory()
+    if category == "none" then return false end
+
+    -- Check group-size-specific setting
+    if category == "small" then
+        local smallKey = settingKey .. "Small"
+        return savedVars[smallKey] == true
+    else  -- large
+        local largeKey = settingKey .. "Large"
+        return savedVars[largeKey] == true
+    end
 end
 
 local function GetPlayerDisplayName(unitId)
@@ -156,6 +208,9 @@ local function CheckTrialStatus()
     GSW.UpdateIndicator()
 end
 
+-- Expose for Settings.lua to call when group size requirement changes
+GSW.CheckTrialStatus = CheckTrialStatus
+
 --------------------------------------------------------------------------------
 -- Detection Logic
 --------------------------------------------------------------------------------
@@ -201,7 +256,7 @@ end
 local MIN_FIGHT_DURATION = 10
 
 local function CheckForMissingBuffs()
-    if not savedVars or not savedVars.enabled or not isInTrial then return end
+    if not savedVars or not savedVars.enabled or isPaused or not isInTrial then return end
 
     -- Only warn if fight lasted at least MIN_FIGHT_DURATION seconds
     local fightDuration = GetGameTimeSeconds() - combatStartTime
@@ -211,7 +266,7 @@ local function CheckForMissingBuffs()
     end
 
     -- Check for missing Major Courage
-    if savedVars.warnMissingCourage then
+    if IsDetectionEnabledForGroupSize("warnMissingCourage") then
         if not HasDetectionForSettingKey("majorCourage") and not warnedThisFight["missingCourage"] then
             warnedThisFight["missingCourage"] = true
             OutputWarning("No Major Courage detected this fight!")
@@ -219,7 +274,7 @@ local function CheckForMissingBuffs()
     end
 
     -- Check for missing Enlivening Overflow
-    if savedVars.warnMissingEnlivening then
+    if IsDetectionEnabledForGroupSize("warnMissingEnlivening") then
         if not HasDetectionForSettingKey("enlivening") and not warnedThisFight["missingEnlivening"] then
             warnedThisFight["missingEnlivening"] = true
             OutputWarning("No Enlivening Overflow detected this fight!")
@@ -227,7 +282,7 @@ local function CheckForMissingBuffs()
     end
 
     -- Check for missing Frost Cloak (Major Resolve)
-    if savedVars.warnMissingFrostCloak then
+    if IsDetectionEnabledForGroupSize("warnMissingFrostCloak") then
         if not HasDetectionForSettingKey("frostCloak") and not warnedThisFight["missingFrostCloak"] then
             warnedThisFight["missingFrostCloak"] = true
             OutputWarning("No Frost Cloak (Major Resolve) detected this fight!")
@@ -266,11 +321,11 @@ local function OnCombatEvent(eventCode, result, isError, abilityName, abilityGra
     local abilityInfo = TRACKED_ABILITIES[abilityId]
     if not abilityInfo then return end
 
-    -- Only process if enabled and in group
-    if not savedVars.enabled or not isInTrial then return end
+    -- Only process if enabled, not paused, and in group
+    if not savedVars.enabled or isPaused or not isInTrial then return end
 
-    -- Check if this specific rule is enabled
-    if not savedVars[abilityInfo.settingKey] then return end
+    -- Check if this specific rule is enabled for current group size
+    if not IsDetectionEnabledForGroupSize(abilityInfo.settingKey) then return end
 
     -- Debug: always log the sourceType to help diagnose
     OutputDebug(string.format("%s: sourceType=%d, source=%s, targetType=%d, target=%s",
@@ -302,6 +357,11 @@ local function OnCombatStateChanged(eventCode, inCombat)
 end
 
 local function OnPlayerActivated()
+    -- Reset pause state on zone change (as per user request)
+    if isPaused then
+        isPaused = false
+        OutputInfo("Pause reset (zone change)")
+    end
     -- Check if we're in a trial zone or large group
     CheckTrialStatus()
 end
@@ -354,6 +414,24 @@ local function InitializeUI()
 end
 
 --------------------------------------------------------------------------------
+-- Pause Toggle (click-to-pause feature)
+--------------------------------------------------------------------------------
+
+function GSW.TogglePause()
+    isPaused = not isPaused
+    local status = isPaused and "paused" or "resumed"
+    OutputInfo("Detection " .. status .. (isPaused and " (until zone change)" or ""))
+    GSW.UpdateIndicator()
+end
+
+function GSW.OnIndicatorClicked(button)
+    -- Only toggle pause on left click when indicator is locked (not being dragged)
+    if button == MOUSE_BUTTON_INDEX_LEFT and savedVars and savedVars.indicatorLocked then
+        GSW.TogglePause()
+    end
+end
+
+--------------------------------------------------------------------------------
 -- Slash Commands
 --------------------------------------------------------------------------------
 
@@ -392,13 +470,16 @@ local function HandleSlashCommand(args)
         OutputInfo("Indicator locked")
         GSW.UpdateIndicator()
 
+    elseif command == "pause" then
+        GSW.TogglePause()
+
     elseif command == "debug" then
         savedVars.debugMode = not savedVars.debugMode
         local status = savedVars.debugMode and "enabled" or "disabled"
         OutputInfo("Debug mode " .. status)
 
     else
-        OutputInfo("Commands: /gsw [on|off|status|unlock|lock|debug]")
+        OutputInfo("Commands: /gsw [on|off|status|unlock|lock|pause|debug]")
     end
 end
 

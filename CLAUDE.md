@@ -1,39 +1,45 @@
 # ESO Group Setup Warnings
 
-Addon that alerts when Champion Points or healing sets are unusual in ESO dungeons and trials.
+Addon that alerts when Champion Points, buffs, or healing sets are duplicated in ESO group content.
 
 ## Addon Goals
 
-Detect duplicate buffs/sets in **trials** during combat and warn the player. Specifically:
+Detect duplicate buffs/sets in **groups** (2+ players) during combat and warn the player. Specifically:
 
-| Type | Name | Ability/Buff ID | Detection Method |
-|------|------|-----------------|------------------|
-| CP | Enlivening Overflow | 156008 | Combat event when CP procs |
-| CP | From the Brink | 156019 | Combat event when heal triggers |
-| Buff | Major Courage | 66902 | Effect applied event |
-| Set | Roaring Opportunist | 135920 | Effect applied event |
-| Set | Symphony of Blades | 117110 | Combat event when proc triggers |
+| Type | Name | Ability IDs | Detection Method |
+|------|------|-------------|------------------|
+| CP | Enlivening Overflow | 156008, 156012 | Combat event when CP procs |
+| Buff | Major Courage | 66902, 109966 | Combat event when buff applied |
+| Skill | Major Resolve (Frost Cloak) | 88758 | Combat event when skill cast |
+| Set | Symphony of Blades | 117110, 117111 | Combat event when proc triggers |
 | Set | Ozezan's Inferno | 188456 | Combat event when proc triggers |
-| Debuff | Major Breach | 61743 | Combat event on hostile target |
-| Enchant | Crusher | 17906 | Combat event on hostile target |
+| Set | Powerful Assault | 61771, 61763 | Combat event when proc triggers |
 
 When 2+ players trigger the same ability/buff in the same fight, display a chat warning listing who has duplicates.
 
-### Missing Debuff Warnings
+### Missing Buff Warnings
 
-For fights lasting 10+ seconds, warn if these debuffs were NOT applied to any enemy:
-- **Major Breach** - Resistance reduction debuff (from Pierce Armor, Elemental Susceptibility, etc.)
-- **Crusher** - Weapon enchant debuff
+For fights lasting 10+ seconds, warn if these buffs were NOT detected:
+- **Major Courage** - Group damage buff (from Olorime, Spell Power Cure, etc.)
+- **Enlivening Overflow** - Champion Point healing star
+- **Frost Cloak** - Major Resolve buff from Warden skill
 
-### Trial-Only Activation
+### Group Activation
 
-The addon only activates detection when `IsUnitInRaid("player")` returns true (player is in a trial).
+The addon activates when in any group (2+ players). Each detection rule has separate toggles for:
+- **Small Group (2-4 players)**: Duos and small groups
+- **Large Group (5+ players)**: Dungeons, trials, and arenas
+
+This allows fine-grained control, e.g., disable Frost Cloak warnings in small groups where it's less relevant.
 
 ### On-Screen Status Indicator
 
-A movable UI element that:
-- **Shows**: Icon or text (e.g., "GSW" or eye icon) when addon is enabled AND player is in a trial
-- **Hidden**: Invisible when disabled OR outside a trial
+A movable, clickable UI element that:
+- **Shows "GSW" (green)**: When addon is enabled AND player is in a group
+- **Shows "GSW (Paused)" (orange)**: When detection is temporarily paused
+- **Shows "GSW not active" (gray)**: When indicator is unlocked for repositioning but detection is inactive
+- **Hidden**: When disabled OR (outside a group AND indicator is locked)
+- **Click to toggle pause**: Left-click the indicator to pause/resume detection (when locked)
 
 ### Slash Commands
 
@@ -42,9 +48,12 @@ A movable UI element that:
 | `/gsw` | Toggle all warnings on/off |
 | `/gsw on` | Enable all warnings |
 | `/gsw off` | Disable all warnings |
-| `/gsw status` | Show current warning state |
+| `/gsw status` | Show current warning state and group status |
 | `/gsw unlock` | Unlock indicator for repositioning |
 | `/gsw lock` | Lock indicator position |
+| `/gsw pause` | Toggle pause (temporary, resets on zone change) |
+| `/gsw debug` | Toggle debug mode (shows individual detections) |
+| `/gswtest` | Display all message types for testing |
 
 ## Settings Panel (LibAddonMenu-2.0)
 
@@ -53,29 +62,36 @@ A movable UI element that:
 |---------|------|---------|-------------|
 | Enable Addon | Checkbox | On | Master on/off toggle |
 | Show Status Indicator | Checkbox | On | Show/hide on-screen indicator |
-| Indicator Locked | Checkbox | On | Lock indicator position |
+| Lock Indicator Position | Checkbox | On | Lock indicator position |
+| Show Initialization Message | Checkbox | On | Show chat message on addon load |
 
 ### Indicator Appearance
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | Font Size | Slider | 16 | Text size (12-24) |
-| Show As Icon | Checkbox | Off | Use icon instead of text |
 
-### Detection Rules (Individual Toggles)
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| Enlivening Overflow | Checkbox | On | Detect duplicate CP |
-| From the Brink | Checkbox | On | Detect duplicate CP |
-| Major Courage | Checkbox | On | Detect duplicate buff |
-| Roaring Opportunist | Checkbox | On | Detect duplicate set |
-| Symphony of Blades | Checkbox | On | Detect duplicate set |
-| Ozezan's Inferno | Checkbox | On | Detect duplicate set |
+### Detection Rules (Duplicate Detection)
 
-### Missing Debuff Warnings
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| Warn Missing Major Breach | Checkbox | On | Warn if no Major Breach on enemies |
-| Warn Missing Crusher | Checkbox | On | Warn if no Crusher on enemies |
+Each detection has Small Group (2-4) and Large Group (5+) checkboxes. If both are off, detection is disabled for that ability.
+
+| Detection | Small Default | Large Default |
+|-----------|---------------|---------------|
+| Enlivening Overflow (CP) | On | On |
+| Major Courage (Buff) | On | On |
+| Frost Cloak (Skill) | Off | On |
+| Symphony of Blades (Set) | On | On |
+| Ozezan's Inferno (Set) | On | On |
+| Powerful Assault (Set) | On | On |
+
+### Missing Buff Warnings
+
+Each warning has Small Group (2-4) and Large Group (5+) checkboxes. If both are off, warning is disabled for that buff.
+
+| Warning | Small Default | Large Default |
+|---------|---------------|---------------|
+| Missing Major Courage | Off | On |
+| Missing Enlivening Overflow | Off | On |
+| Missing Frost Cloak | Off | On |
 
 ## Feasibility Analysis
 
@@ -83,9 +99,8 @@ A movable UI element that:
 
 **Can detect (via combat log):**
 - `EVENT_COMBAT_EVENT` — Fires for damage, healing, and buff applications. Provides `sourceUnitId`, `abilityId`, etc.
-- `EVENT_EFFECT_CHANGED` — Fires when buffs are applied/removed. Provides `unitTag`, `effectSlot`, `abilityId`, etc.
 - `GetUnitName(unitTag)` — Get player name from unit tag
-- `IsUnitInRaid("player")` — Check if in trial/raid
+- `GetGroupSize()` — Check if in a group (2+ players)
 - `IsUnitInCombat("player")` — Check combat state
 
 **UI APIs (for status indicator):**
@@ -101,22 +116,24 @@ A movable UI element that:
 - Cannot directly query what CP abilities other players have slotted (must wait for proc)
 - Detection is reactive (see ability when it fires, not when equipped)
 - UI position must be saved in SavedVariables to persist across sessions
+- `EVENT_EFFECT_CHANGED` only identifies buff recipient, not who applied it (causes false positives)
 
 ### Implementation Strategy
 
-1. **Trial Detection**: Use `IsUnitInRaid("player")` or check zone IDs for trial zones
+1. **Group Detection**: Use `GetGroupSize()` to categorize: small (2-4) or large (5+) groups
 2. **Combat Tracking**: Register for `EVENT_PLAYER_COMBAT_STATE` to track fight boundaries
 3. **Ability Detection**:
    - Hook `EVENT_COMBAT_EVENT` with filter for target ability IDs
-   - Hook `EVENT_EFFECT_CHANGED` for buff applications
+   - NOTE: `EVENT_EFFECT_CHANGED` is disabled due to false positives (detects recipient, not source)
 4. **Duplicate Tracking**: Maintain per-fight table of `{abilityId = {playerName1, playerName2, ...}}`
-5. **Warning Output**: Use `d()` or `CHAT_SYSTEM:AddMessage()` for warnings
+5. **Warning Output**: Use `CHAT_ROUTER:AddSystemMessage()` for warnings
 6. **Fight Reset**: Clear tracking tables when combat ends
-7. **Status Indicator UI**:
-   - Define in XML with TopLevelControl, label, and optional icon texture
+7. **Missing Buff Check**: At end of combat (if fight >= 10s), warn if expected buffs weren't detected
+8. **Status Indicator UI**:
+   - Define in XML with TopLevelControl and label
    - Register `OnMoveStop` handler to save position to SavedVariables
-   - Update visibility on zone change (`EVENT_PLAYER_ACTIVATED`)
-   - Refresh text when rules are toggled in settings
+   - Update visibility on group change events
+   - Show gray "GSW not active" text when unlocked for repositioning
 
 ### Key Combat Event Filter
 
@@ -156,14 +173,15 @@ zip -r GroupSetupWarnings.zip GroupSetupWarnings -x "*.git*" -x "*.md" -x ".luac
 ### Manifest Format
 ```
 ## Title: Group Setup Warnings
-## Description: Alerts when CPs and healing sets are unusual in dungeons/trials
+## Description: Alerts when Champion Points and healing sets are duplicated in trials
 ## Author: brainsnorkel
-## Version: 1.0.0
-## APIVersion: 101048
+## Version: 1.6.0
+## APIVersion: 101044
 ## SavedVariables: GroupSetupWarningsSV
-## DependsOn: LibAddonMenu-2.0
-## OptionalDependsOn: LibDebugLogger
+## OptionalDependsOn: LibAddonMenu-2.0 LibDebugLogger
 ```
+
+Note: LibAddonMenu-2.0 is optional. The addon works without it but won't have a settings panel.
 
 ### Event Registration
 ```lua
@@ -190,9 +208,12 @@ ZO_SavedVars:NewAccountWide("GroupSetupWarningsSV", 1, nil, defaults)
 
 ## Common Libraries
 
-- **LibAddonMenu-2.0** — Settings menu (external dependency)
+- **LibAddonMenu-2.0** — Settings menu (optional, addon works without it)
 - **LibDebugLogger** — Debug logging (optional)
-- **LibAsync** — Deferred actions
+
+## Reference Documentation
+
+- **ESOUI Wiki** — https://wiki.esoui.com/ — Primary reference for ESO addon API and Lua documentation
 
 ## CI/CD
 

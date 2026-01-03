@@ -40,6 +40,7 @@ globals = {
     "REGISTER_FILTER_IS_ERROR",
     "CENTER",
     "TOPLEFT",
+    "MOUSE_BUTTON_INDEX_LEFT",
 
     -- ESO Functions
     "d",

@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.7.0] - 2026-01-04
+### Added
+- Powerful Assault set duplicate detection (ability IDs 61771, 61763)
+
+## [1.6.0] - 2026-01-04
+### Changed
+- Simplified settings: removed master toggles for each detection
+- Detection is now controlled by just Small Group (2-4) and Large Group (5+) checkboxes
+- If both group size checkboxes are off, detection is disabled for that ability
+
 ## [1.5.0] - 2026-01-04
 ### Added
 - Frost Cloak (Major Resolve) tracking - detects duplicates and warns if missing

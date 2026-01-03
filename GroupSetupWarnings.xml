@@ -8,6 +8,10 @@
                 GroupSetupWarnings.OnIndicatorMoveStop()
             </OnMoveStop>
 
+            <OnMouseUp>
+                GroupSetupWarnings.OnIndicatorClicked(button)
+            </OnMouseUp>
+
             <Controls>
                 <!-- Background -->
                 <Backdrop name="$(parent)BG" inherits="ZO_DefaultBackdrop">

@@ -9,7 +9,8 @@ local function GetPanelData()
         name = "Group Setup Warnings",
         displayName = "Group Setup Warnings",
         author = "brainsnorkel",
-        version = GSW.version or "1.3.0",
+        version = GSW.version or "1.5.0",
+        website = "https://github.com/brainsnorkel/GroupSetupWarnings",
         slashCommand = "/gswsettings",
         registerForRefresh = true,
         registerForDefaults = true,
@@ -32,7 +33,7 @@ local function CreateOptionsTable()
         {
             type = "checkbox",
             name = "Enable Addon",
-            tooltip = "Master toggle for all duplicate detection warnings",
+            tooltip = "Enable or disable all detection. When disabled, no warnings are shown.",
             getFunc = function() return savedVars.enabled end,
             setFunc = function(value)
                 savedVars.enabled = value
@@ -46,7 +47,7 @@ local function CreateOptionsTable()
         {
             type = "checkbox",
             name = "Show Status Indicator",
-            tooltip = "Show the on-screen indicator when in a trial",
+            tooltip = "Display the 'GSW' indicator on screen when in a group.",
             getFunc = function() return savedVars.showIndicator end,
             setFunc = function(value)
                 savedVars.showIndicator = value
@@ -60,7 +61,7 @@ local function CreateOptionsTable()
         {
             type = "checkbox",
             name = "Lock Indicator Position",
-            tooltip = "Lock the indicator so it cannot be moved",
+            tooltip = "When locked, the indicator cannot be dragged. Use /gsw unlock to reposition it.",
             getFunc = function() return savedVars.indicatorLocked end,
             setFunc = function(value)
                 savedVars.indicatorLocked = value
@@ -74,7 +75,7 @@ local function CreateOptionsTable()
         {
             type = "checkbox",
             name = "Show Initialization Message",
-            tooltip = "Show a chat message when the addon loads",
+            tooltip = "Show 'Group Setup Warnings loaded' message in chat when you log in or reload UI.",
             getFunc = function() return savedVars.showInitMessage end,
             setFunc = function(value) savedVars.showInitMessage = value end,
             width = "full",
@@ -90,7 +91,7 @@ local function CreateOptionsTable()
         {
             type = "slider",
             name = "Font Size",
-            tooltip = "Size of the indicator text",
+            tooltip = "Text size for the on-screen 'GSW' indicator (12-24 pixels).",
             min = 12,
             max = 24,
             step = 1,
@@ -108,66 +109,206 @@ local function CreateOptionsTable()
         -- Detection Rules Header
         {
             type = "header",
-            name = "Detection Rules",
+            name = "Duplicate Detection",
             width = "full",
         },
         {
             type = "description",
-            text = "Enable or disable detection for specific abilities and sets.",
+            text = "Warn when 2+ players trigger the same ability. " ..
+                "Enable for Small (2-4) and/or Large (5+) groups.",
             width = "full",
         },
+
+        -- Enlivening Overflow
         {
             type = "checkbox",
-            name = "Enlivening Overflow (CP)",
-            tooltip = "Detect when multiple players have Enlivening Overflow slotted",
-            getFunc = function() return savedVars.enlivening end,
-            setFunc = function(value) savedVars.enlivening = value end,
-            width = "full",
+            name = "Enlivening Overflow (CP) - Small",
+            tooltip = "Detect duplicate Enlivening Overflow in small groups (2-4 players).",
+            getFunc = function() return savedVars.enliveningSmall end,
+            setFunc = function(value) savedVars.enliveningSmall = value end,
+            width = "half",
             default = true,
         },
         {
             type = "checkbox",
-            name = "Major Courage (Buff)",
-            tooltip = "Detect when multiple players are providing Major Courage",
-            getFunc = function() return savedVars.majorCourage end,
-            setFunc = function(value) savedVars.majorCourage = value end,
-            width = "full",
+            name = "Enlivening Overflow (CP) - Large",
+            tooltip = "Detect duplicate Enlivening Overflow in large groups (5+ players).",
+            getFunc = function() return savedVars.enliveningLarge end,
+            setFunc = function(value) savedVars.enliveningLarge = value end,
+            width = "half",
+            default = true,
+        },
+
+        -- Major Courage
+        {
+            type = "checkbox",
+            name = "Major Courage (Buff) - Small",
+            tooltip = "Detect duplicate Major Courage in small groups (2-4 players).",
+            getFunc = function() return savedVars.majorCourageSmall end,
+            setFunc = function(value) savedVars.majorCourageSmall = value end,
+            width = "half",
             default = true,
         },
         {
             type = "checkbox",
-            name = "Major Resolve - Frost Cloak (Skill)",
-            tooltip = "Detect when multiple players are casting Frost Cloak for Major Resolve, and warn if missing",
-            getFunc = function() return savedVars.frostCloak end,
-            setFunc = function(value) savedVars.frostCloak = value end,
-            width = "full",
+            name = "Major Courage (Buff) - Large",
+            tooltip = "Detect duplicate Major Courage in large groups (5+ players).",
+            getFunc = function() return savedVars.majorCourageLarge end,
+            setFunc = function(value) savedVars.majorCourageLarge = value end,
+            width = "half",
+            default = true,
+        },
+
+        -- Frost Cloak
+        {
+            type = "checkbox",
+            name = "Frost Cloak (Skill) - Small",
+            tooltip = "Detect duplicate Frost Cloak in small groups (2-4 players).",
+            getFunc = function() return savedVars.frostCloakSmall end,
+            setFunc = function(value) savedVars.frostCloakSmall = value end,
+            width = "half",
+            default = false,
+        },
+        {
+            type = "checkbox",
+            name = "Frost Cloak (Skill) - Large",
+            tooltip = "Detect duplicate Frost Cloak in large groups (5+ players).",
+            getFunc = function() return savedVars.frostCloakLarge end,
+            setFunc = function(value) savedVars.frostCloakLarge = value end,
+            width = "half",
+            default = true,
+        },
+
+        -- Symphony of Blades
+        {
+            type = "checkbox",
+            name = "Symphony of Blades (Set) - Small",
+            tooltip = "Detect duplicate Symphony of Blades in small groups (2-4 players).",
+            getFunc = function() return savedVars.symphonyOfBladesSmall end,
+            setFunc = function(value) savedVars.symphonyOfBladesSmall = value end,
+            width = "half",
             default = true,
         },
         {
             type = "checkbox",
-            name = "Warn Missing Frost Cloak",
-            tooltip = "Show warning if no Frost Cloak (Major Resolve) was cast during a fight",
-            getFunc = function() return savedVars.warnMissingFrostCloak end,
-            setFunc = function(value) savedVars.warnMissingFrostCloak = value end,
-            width = "full",
+            name = "Symphony of Blades (Set) - Large",
+            tooltip = "Detect duplicate Symphony of Blades in large groups (5+ players).",
+            getFunc = function() return savedVars.symphonyOfBladesLarge end,
+            setFunc = function(value) savedVars.symphonyOfBladesLarge = value end,
+            width = "half",
+            default = true,
+        },
+
+        -- Ozezan's Inferno
+        {
+            type = "checkbox",
+            name = "Ozezan's Inferno (Set) - Small",
+            tooltip = "Detect duplicate Ozezan's Inferno in small groups (2-4 players).",
+            getFunc = function() return savedVars.ozezanInfernoSmall end,
+            setFunc = function(value) savedVars.ozezanInfernoSmall = value end,
+            width = "half",
             default = true,
         },
         {
             type = "checkbox",
-            name = "Symphony of Blades (Set)",
-            tooltip = "Detect when multiple players have Symphony of Blades equipped",
-            getFunc = function() return savedVars.symphonyOfBlades end,
-            setFunc = function(value) savedVars.symphonyOfBlades = value end,
-            width = "full",
+            name = "Ozezan's Inferno (Set) - Large",
+            tooltip = "Detect duplicate Ozezan's Inferno in large groups (5+ players).",
+            getFunc = function() return savedVars.ozezanInfernoLarge end,
+            setFunc = function(value) savedVars.ozezanInfernoLarge = value end,
+            width = "half",
+            default = true,
+        },
+
+        -- Powerful Assault
+        {
+            type = "checkbox",
+            name = "Powerful Assault (Set) - Small",
+            tooltip = "Detect duplicate Powerful Assault in small groups (2-4 players).",
+            getFunc = function() return savedVars.powerfulAssaultSmall end,
+            setFunc = function(value) savedVars.powerfulAssaultSmall = value end,
+            width = "half",
             default = true,
         },
         {
             type = "checkbox",
-            name = "Ozezan's Inferno (Set)",
-            tooltip = "Detect when multiple players have Ozezan's Inferno equipped",
-            getFunc = function() return savedVars.ozezanInferno end,
-            setFunc = function(value) savedVars.ozezanInferno = value end,
+            name = "Powerful Assault (Set) - Large",
+            tooltip = "Detect duplicate Powerful Assault in large groups (5+ players).",
+            getFunc = function() return savedVars.powerfulAssaultLarge end,
+            setFunc = function(value) savedVars.powerfulAssaultLarge = value end,
+            width = "half",
+            default = true,
+        },
+
+        -- Missing Buff Warnings Header
+        {
+            type = "header",
+            name = "Missing Buff Warnings",
             width = "full",
+        },
+        {
+            type = "description",
+            text = "Warn at end of fights (10+ sec) if buffs not detected. " ..
+                "Enable for Small (2-4) and/or Large (5+) groups.",
+            width = "full",
+        },
+
+        -- Missing Major Courage
+        {
+            type = "checkbox",
+            name = "Missing Major Courage - Small",
+            tooltip = "Warn if Major Courage not detected in small groups (2-4 players).",
+            getFunc = function() return savedVars.warnMissingCourageSmall end,
+            setFunc = function(value) savedVars.warnMissingCourageSmall = value end,
+            width = "half",
+            default = false,
+        },
+        {
+            type = "checkbox",
+            name = "Missing Major Courage - Large",
+            tooltip = "Warn if Major Courage not detected in large groups (5+ players).",
+            getFunc = function() return savedVars.warnMissingCourageLarge end,
+            setFunc = function(value) savedVars.warnMissingCourageLarge = value end,
+            width = "half",
+            default = true,
+        },
+
+        -- Missing Enlivening Overflow
+        {
+            type = "checkbox",
+            name = "Missing Enlivening Overflow - Small",
+            tooltip = "Warn if Enlivening Overflow not detected in small groups (2-4 players).",
+            getFunc = function() return savedVars.warnMissingEnliveningSmall end,
+            setFunc = function(value) savedVars.warnMissingEnliveningSmall = value end,
+            width = "half",
+            default = false,
+        },
+        {
+            type = "checkbox",
+            name = "Missing Enlivening Overflow - Large",
+            tooltip = "Warn if Enlivening Overflow not detected in large groups (5+ players).",
+            getFunc = function() return savedVars.warnMissingEnliveningLarge end,
+            setFunc = function(value) savedVars.warnMissingEnliveningLarge = value end,
+            width = "half",
+            default = true,
+        },
+
+        -- Missing Frost Cloak
+        {
+            type = "checkbox",
+            name = "Missing Frost Cloak - Small",
+            tooltip = "Warn if Frost Cloak not detected in small groups (2-4 players).",
+            getFunc = function() return savedVars.warnMissingFrostCloakSmall end,
+            setFunc = function(value) savedVars.warnMissingFrostCloakSmall = value end,
+            width = "half",
+            default = false,
+        },
+        {
+            type = "checkbox",
+            name = "Missing Frost Cloak - Large",
+            tooltip = "Warn if Frost Cloak not detected in large groups (5+ players).",
+            getFunc = function() return savedVars.warnMissingFrostCloakLarge end,
+            setFunc = function(value) savedVars.warnMissingFrostCloakLarge = value end,
+            width = "half",
             default = true,
         },
     }
