@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.5.0] - 2026-01-04
+### Added
+- Frost Cloak (Major Resolve) tracking - detects duplicates and warns if missing
+- Player names now show both character name and @handle format
+
+### Changed
+- Removed From the Brink, Roaring Opportunist detection (unreliable)
+- Removed Major Breach/Crusher detection (ESO API limitation - can't see other players' debuffs)
+- Removed "Show As Icon" setting
+
 ## [1.4.0] - 2026-01-04
 ### Changed
 - Use ESO's `COMBAT_UNIT_TYPE_PLAYER` constant instead of hardcoded value

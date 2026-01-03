@@ -13,20 +13,16 @@ local ADDON_NAME = "GroupSetupWarnings"
 local TRACKED_ABILITIES = {
     [156008] = { name = "Enlivening Overflow", type = "CP", settingKey = "enlivening" },
     [156012] = { name = "Enlivening Overflow", type = "CP", settingKey = "enlivening" },  -- Alternate ID
-    [156019] = { name = "From the Brink", type = "CP", settingKey = "fromTheBrink" },
-    [156020] = { name = "From the Brink", type = "CP", settingKey = "fromTheBrink" },  -- Alternate ID
     [66902]  = { name = "Major Courage", type = "Buff", settingKey = "majorCourage" },
     [109966] = { name = "Major Courage", type = "Buff", settingKey = "majorCourage" },  -- Alternate ID (Olorime/etc)
-    [135920] = { name = "Roaring Opportunist", type = "Set", settingKey = "roaringOpportunist" },
+    [88758]  = { name = "Major Resolve (Frost Cloak)", type = "Skill", settingKey = "frostCloak" },
     [117110] = { name = "Symphony of Blades", type = "Set", settingKey = "symphonyOfBlades" },
     [117111] = { name = "Symphony of Blades", type = "Set", settingKey = "symphonyOfBlades" },  -- Meridia's Favor buff
     [188456] = { name = "Ozezan's Inferno", type = "Set", settingKey = "ozezanInferno" },
-    [61743]  = { name = "Major Breach", type = "Debuff", settingKey = "majorBreach", targetHostile = true },
-    [17906]  = { name = "Crusher", type = "Enchant", settingKey = "crusher", targetHostile = true },
 }
 
 -- Addon version (keep in sync with manifest)
-GSW.version = "1.4.0"
+GSW.version = "1.5.0"
 
 -- Default settings
 local DEFAULT_SETTINGS = {
@@ -36,22 +32,17 @@ local DEFAULT_SETTINGS = {
     indicatorX = nil,
     indicatorY = nil,
     fontSize = 16,
-    showAsIcon = false,
     showInitMessage = true,  -- Show initialization message on load
     debugMode = false,       -- Show individual detections
     warnMissingCourage = true,  -- Warn if no Major Courage in fight
     warnMissingEnlivening = true,  -- Warn if no Enlivening Overflow in fight
-    warnMissingBreach = true,  -- Warn if no Major Breach in fight
-    warnMissingCrusher = true,  -- Warn if no Crusher in fight
+    warnMissingFrostCloak = true,  -- Warn if no Frost Cloak in fight
     -- Detection rules (duplicate detection)
     enlivening = true,
-    fromTheBrink = true,
     majorCourage = true,
-    roaringOpportunist = true,
+    frostCloak = true,  -- Track Frost Cloak for missing buff warning
     symphonyOfBlades = true,
     ozezanInferno = true,
-    majorBreach = true,  -- Detect Major Breach applications
-    crusher = true,      -- Detect Crusher applications
 }
 
 -- State
@@ -65,7 +56,6 @@ local combatStartTime = 0  -- When combat started (for minimum fight duration ch
 -- UI Elements
 local indicator = nil
 local indicatorLabel = nil
-local indicatorIcon = nil
 
 -- UpdateIndicator function - defined on GSW table for access from Settings.lua
 function GSW.UpdateIndicator()
@@ -84,21 +74,13 @@ function GSW.UpdateIndicator()
         local fontString = string.format("$(MEDIUM_FONT)|%d|soft-shadow-thin", savedVars.fontSize)
         indicatorLabel:SetFont(fontString)
 
-        -- Toggle between icon and text mode
-        if savedVars.showAsIcon then
-            indicatorLabel:SetHidden(true)
-            indicatorIcon:SetHidden(false)
+        -- Show "Not in trial" when unlocked but not active
+        if isUnlocked and not isActive then
+            indicatorLabel:SetText("Not in trial")
+            indicatorLabel:SetColor(0.5, 0.5, 0.5, 1) -- Gray
         else
-            indicatorLabel:SetHidden(false)
-            indicatorIcon:SetHidden(true)
-            -- Show "Not in trial" when unlocked but not active
-            if isUnlocked and not isActive then
-                indicatorLabel:SetText("Not in trial")
-                indicatorLabel:SetColor(0.5, 0.5, 0.5, 1) -- Gray
-            else
-                indicatorLabel:SetText("GSW")
-                indicatorLabel:SetColor(0, 1, 0, 1) -- Green
-            end
+            indicatorLabel:SetText("GSW")
+            indicatorLabel:SetColor(0, 1, 0, 1) -- Green
         end
 
         -- Update movability
@@ -119,13 +101,19 @@ local function IsInGroup()
     return false
 end
 
-local function GetPlayerNameFromUnitId(unitId)
+local function GetPlayerDisplayName(unitId)
+    -- Returns "CharacterName (@Handle)" format
     if unitId and unitId > 0 and GetUnitTagByUnitId then
         local unitTag = GetUnitTagByUnitId(unitId)
         if unitTag and unitTag ~= "" then
-            local name = GetUnitName(unitTag)
-            -- Strip gender markers (^Fx, ^Mx) from name
-            return zo_strformat("<<1>>", name)
+            local charName = GetUnitName(unitTag)
+            local displayName = GetUnitDisplayName(unitTag)
+            -- Strip gender markers (^Fx, ^Mx) from character name
+            charName = zo_strformat("<<1>>", charName)
+            if displayName and displayName ~= "" then
+                return string.format("%s (%s)", charName, displayName)
+            end
+            return charName
         end
     end
     return nil
@@ -238,19 +226,11 @@ local function CheckForMissingBuffs()
         end
     end
 
-    -- Check for missing Major Breach
-    if savedVars.warnMissingBreach then
-        if not HasDetectionForSettingKey("majorBreach") and not warnedThisFight["missingBreach"] then
-            warnedThisFight["missingBreach"] = true
-            OutputWarning("No Major Breach detected this fight!")
-        end
-    end
-
-    -- Check for missing Crusher
-    if savedVars.warnMissingCrusher then
-        if not HasDetectionForSettingKey("crusher") and not warnedThisFight["missingCrusher"] then
-            warnedThisFight["missingCrusher"] = true
-            OutputWarning("No Crusher detected this fight!")
+    -- Check for missing Frost Cloak (Major Resolve)
+    if savedVars.warnMissingFrostCloak then
+        if not HasDetectionForSettingKey("frostCloak") and not warnedThisFight["missingFrostCloak"] then
+            warnedThisFight["missingFrostCloak"] = true
+            OutputWarning("No Frost Cloak (Major Resolve) detected this fight!")
         end
     end
 end
@@ -292,20 +272,12 @@ local function OnCombatEvent(eventCode, result, isError, abilityName, abilityGra
     -- Check if this specific rule is enabled
     if not savedVars[abilityInfo.settingKey] then return end
 
-    -- For debuffs that target hostiles, verify target is a monster (not player)
-    if abilityInfo.targetHostile then
-        -- Skip if debuff hit a player (we want hostile targets only)
-        if targetType == COMBAT_UNIT_TYPE_PLAYER then
-            return
-        end
-    end
-
     -- Debug: always log the sourceType to help diagnose
     OutputDebug(string.format("%s: sourceType=%d, source=%s, targetType=%d, target=%s",
         abilityName, sourceType, tostring(sourceName), targetType, tostring(targetName)))
 
     -- Get source player name (who applied/cast the buff)
-    local playerName = GetPlayerNameFromUnitId(sourceUnitId)
+    local playerName = GetPlayerDisplayName(sourceUnitId)
     if not playerName then
         playerName = zo_strformat("<<1>>", sourceName)
     end
@@ -376,7 +348,6 @@ local function InitializeUI()
     indicator = GroupSetupWarningsIndicator
     if indicator then
         indicatorLabel = indicator:GetNamedChild("Label")
-        indicatorIcon = indicator:GetNamedChild("Icon")
         RestoreIndicatorPosition()
         GSW.UpdateIndicator()
     end
@@ -443,13 +414,9 @@ local function HandleTestCommand()
     CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r Indicator locked")
     CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r Commands: /gsw [on|off|status|unlock|lock]")
     CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate Enlivening Overflow (CP) detected: Player1, Player2")
-    CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate From the Brink (CP) detected: Player1, Player2")
     CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate Major Courage (Buff) detected: Player1, Player2")
-    CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate Roaring Opportunist (Set) detected: Player1, Player2")
     CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate Symphony of Blades (Set) detected: Player1, Player2")
     CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate Ozezan's Inferno (Set) detected: Player1, Player2")
-    CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r No Major Breach detected this fight!")
-    CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r No Crusher detected this fight!")
     CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r === End Test ===")
 end
 

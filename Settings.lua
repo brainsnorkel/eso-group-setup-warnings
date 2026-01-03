@@ -104,20 +104,6 @@ local function CreateOptionsTable()
             width = "full",
             default = 16,
         },
-        {
-            type = "checkbox",
-            name = "Show As Icon",
-            tooltip = "Display an icon instead of text",
-            getFunc = function() return savedVars.showAsIcon end,
-            setFunc = function(value)
-                savedVars.showAsIcon = value
-                if GSW.UpdateIndicator then
-                    GSW.UpdateIndicator()
-                end
-            end,
-            width = "full",
-            default = false,
-        },
 
         -- Detection Rules Header
         {
@@ -141,15 +127,6 @@ local function CreateOptionsTable()
         },
         {
             type = "checkbox",
-            name = "From the Brink (CP)",
-            tooltip = "Detect when multiple players are providing From the Brink healing",
-            getFunc = function() return savedVars.fromTheBrink end,
-            setFunc = function(value) savedVars.fromTheBrink = value end,
-            width = "full",
-            default = true,
-        },
-        {
-            type = "checkbox",
             name = "Major Courage (Buff)",
             tooltip = "Detect when multiple players are providing Major Courage",
             getFunc = function() return savedVars.majorCourage end,
@@ -159,10 +136,19 @@ local function CreateOptionsTable()
         },
         {
             type = "checkbox",
-            name = "Roaring Opportunist (Set)",
-            tooltip = "Detect when multiple players have Roaring Opportunist equipped",
-            getFunc = function() return savedVars.roaringOpportunist end,
-            setFunc = function(value) savedVars.roaringOpportunist = value end,
+            name = "Major Resolve - Frost Cloak (Skill)",
+            tooltip = "Detect when multiple players are casting Frost Cloak for Major Resolve, and warn if missing",
+            getFunc = function() return savedVars.frostCloak end,
+            setFunc = function(value) savedVars.frostCloak = value end,
+            width = "full",
+            default = true,
+        },
+        {
+            type = "checkbox",
+            name = "Warn Missing Frost Cloak",
+            tooltip = "Show warning if no Frost Cloak (Major Resolve) was cast during a fight",
+            getFunc = function() return savedVars.warnMissingFrostCloak end,
+            setFunc = function(value) savedVars.warnMissingFrostCloak = value end,
             width = "full",
             default = true,
         },
@@ -181,36 +167,6 @@ local function CreateOptionsTable()
             tooltip = "Detect when multiple players have Ozezan's Inferno equipped",
             getFunc = function() return savedVars.ozezanInferno end,
             setFunc = function(value) savedVars.ozezanInferno = value end,
-            width = "full",
-            default = true,
-        },
-
-        -- Missing Debuff Warnings Header
-        {
-            type = "header",
-            name = "Missing Debuff Warnings",
-            width = "full",
-        },
-        {
-            type = "description",
-            text = "Warn if these debuffs are not applied to enemies during fights (10+ seconds).",
-            width = "full",
-        },
-        {
-            type = "checkbox",
-            name = "Warn Missing Major Breach",
-            tooltip = "Show warning if no Major Breach debuff was applied to enemies during a fight",
-            getFunc = function() return savedVars.warnMissingBreach end,
-            setFunc = function(value) savedVars.warnMissingBreach = value end,
-            width = "full",
-            default = true,
-        },
-        {
-            type = "checkbox",
-            name = "Warn Missing Crusher",
-            tooltip = "Show warning if no Crusher enchant was applied to enemies during a fight",
-            getFunc = function() return savedVars.warnMissingCrusher end,
-            setFunc = function(value) savedVars.warnMissingCrusher = value end,
             width = "full",
             default = true,
         },

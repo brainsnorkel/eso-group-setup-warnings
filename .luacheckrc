@@ -41,15 +41,13 @@ globals = {
     "CENTER",
     "TOPLEFT",
 
-    -- ESO Combat constants
-    "COMBAT_UNIT_TYPE_PLAYER",
-
     -- ESO Functions
     "d",
     "IsUnitInRaid",
     "GetUnitTagById",
     "GetUnitTagByUnitId",
     "GetUnitName",
+    "GetUnitDisplayName",
     "GetCurrentZoneId",
     "GetGroupSize",
     "zo_strformat",
