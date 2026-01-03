@@ -21,7 +21,12 @@ local TRACKED_ABILITIES = {
     [117110] = { name = "Symphony of Blades", type = "Set", settingKey = "symphonyOfBlades" },
     [117111] = { name = "Symphony of Blades", type = "Set", settingKey = "symphonyOfBlades" },  -- Meridia's Favor buff
     [188456] = { name = "Ozezan's Inferno", type = "Set", settingKey = "ozezanInferno" },
+    [61743]  = { name = "Major Breach", type = "Debuff", settingKey = "majorBreach", targetHostile = true },
+    [17906]  = { name = "Crusher", type = "Enchant", settingKey = "crusher", targetHostile = true },
 }
+
+-- Addon version (keep in sync with manifest)
+GSW.version = "1.4.0"
 
 -- Default settings
 local DEFAULT_SETTINGS = {
@@ -36,13 +41,17 @@ local DEFAULT_SETTINGS = {
     debugMode = false,       -- Show individual detections
     warnMissingCourage = true,  -- Warn if no Major Courage in fight
     warnMissingEnlivening = true,  -- Warn if no Enlivening Overflow in fight
-    -- Detection rules
+    warnMissingBreach = true,  -- Warn if no Major Breach in fight
+    warnMissingCrusher = true,  -- Warn if no Crusher in fight
+    -- Detection rules (duplicate detection)
     enlivening = true,
     fromTheBrink = true,
     majorCourage = true,
     roaringOpportunist = true,
     symphonyOfBlades = true,
     ozezanInferno = true,
+    majorBreach = true,  -- Detect Major Breach applications
+    crusher = true,      -- Detect Crusher applications
 }
 
 -- State
@@ -192,7 +201,7 @@ local function HasDetectionForSettingKey(settingKey)
     for abilityId, info in pairs(TRACKED_ABILITIES) do
         if info.settingKey == settingKey and fightDetections[abilityId] then
             -- Check if there's at least one player recorded
-            for _ in pairs(fightDetections[abilityId]) do
+            if next(fightDetections[abilityId]) then
                 return true
             end
         end
@@ -228,6 +237,22 @@ local function CheckForMissingBuffs()
             OutputWarning("No Enlivening Overflow detected this fight!")
         end
     end
+
+    -- Check for missing Major Breach
+    if savedVars.warnMissingBreach then
+        if not HasDetectionForSettingKey("majorBreach") and not warnedThisFight["missingBreach"] then
+            warnedThisFight["missingBreach"] = true
+            OutputWarning("No Major Breach detected this fight!")
+        end
+    end
+
+    -- Check for missing Crusher
+    if savedVars.warnMissingCrusher then
+        if not HasDetectionForSettingKey("crusher") and not warnedThisFight["missingCrusher"] then
+            warnedThisFight["missingCrusher"] = true
+            OutputWarning("No Crusher detected this fight!")
+        end
+    end
 end
 
 local function RecordAbilityUse(abilityId, playerName)
@@ -251,10 +276,7 @@ end
 -- Event Handlers
 --------------------------------------------------------------------------------
 
--- Combat unit type constants (ESO defines these globally)
--- COMBAT_UNIT_TYPE_PLAYER = 1, COMBAT_UNIT_TYPE_PLAYER_PET = 2, etc.
--- But we define locally in case they're not available
-local UNIT_TYPE_PLAYER = 1
+-- Combat unit type constant (use ESO's global constant)
 
 local function OnCombatEvent(eventCode, result, isError, abilityName, abilityGraphic,
     abilityActionSlotType, sourceName, sourceType, targetName, targetType,
@@ -269,6 +291,14 @@ local function OnCombatEvent(eventCode, result, isError, abilityName, abilityGra
 
     -- Check if this specific rule is enabled
     if not savedVars[abilityInfo.settingKey] then return end
+
+    -- For debuffs that target hostiles, verify target is a monster (not player)
+    if abilityInfo.targetHostile then
+        -- Skip if debuff hit a player (we want hostile targets only)
+        if targetType == COMBAT_UNIT_TYPE_PLAYER then
+            return
+        end
+    end
 
     -- Debug: always log the sourceType to help diagnose
     OutputDebug(string.format("%s: sourceType=%d, source=%s, targetType=%d, target=%s",
@@ -418,6 +448,8 @@ local function HandleTestCommand()
     CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate Roaring Opportunist (Set) detected: Player1, Player2")
     CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate Symphony of Blades (Set) detected: Player1, Player2")
     CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r Duplicate Ozezan's Inferno (Set) detected: Player1, Player2")
+    CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r No Major Breach detected this fight!")
+    CHAT_ROUTER:AddSystemMessage("|cFF6600[GSW]|r No Crusher detected this fight!")
     CHAT_ROUTER:AddSystemMessage("|c00CCFF[GSW]|r === End Test ===")
 end
 

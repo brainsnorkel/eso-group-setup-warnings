@@ -3,16 +3,18 @@
 
 local GSW = GroupSetupWarnings
 
-local panelData = {
-    type = "panel",
-    name = "Group Setup Warnings",
-    displayName = "Group Setup Warnings",
-    author = "brainsnorkel",
-    version = "1.0.0",
-    slashCommand = "/gswsettings",
-    registerForRefresh = true,
-    registerForDefaults = true,
-}
+local function GetPanelData()
+    return {
+        type = "panel",
+        name = "Group Setup Warnings",
+        displayName = "Group Setup Warnings",
+        author = "brainsnorkel",
+        version = GSW.version or "1.3.0",
+        slashCommand = "/gswsettings",
+        registerForRefresh = true,
+        registerForDefaults = true,
+    }
+end
 
 local function CreateOptionsTable()
     local savedVars = GSW.savedVars
@@ -182,6 +184,36 @@ local function CreateOptionsTable()
             width = "full",
             default = true,
         },
+
+        -- Missing Debuff Warnings Header
+        {
+            type = "header",
+            name = "Missing Debuff Warnings",
+            width = "full",
+        },
+        {
+            type = "description",
+            text = "Warn if these debuffs are not applied to enemies during fights (10+ seconds).",
+            width = "full",
+        },
+        {
+            type = "checkbox",
+            name = "Warn Missing Major Breach",
+            tooltip = "Show warning if no Major Breach debuff was applied to enemies during a fight",
+            getFunc = function() return savedVars.warnMissingBreach end,
+            setFunc = function(value) savedVars.warnMissingBreach = value end,
+            width = "full",
+            default = true,
+        },
+        {
+            type = "checkbox",
+            name = "Warn Missing Crusher",
+            tooltip = "Show warning if no Crusher enchant was applied to enemies during a fight",
+            getFunc = function() return savedVars.warnMissingCrusher end,
+            setFunc = function(value) savedVars.warnMissingCrusher = value end,
+            width = "full",
+            default = true,
+        },
     }
 
     return optionsTable
@@ -206,7 +238,7 @@ local function InitializeSettings()
         return
     end
 
-    local panel = LAM:RegisterAddonPanel("GroupSetupWarningsOptions", panelData)
+    local panel = LAM:RegisterAddonPanel("GroupSetupWarningsOptions", GetPanelData())
     if panel then
         LAM:RegisterOptionControls("GroupSetupWarningsOptions", CreateOptionsTable())
         settingsInitialized = true
@@ -229,33 +261,18 @@ local function TryInitializeSettings()
     return true
 end
 
--- Try to initialize when LibAddonMenu-2.0 loads
-local function OnLibAddonMenuLoaded(eventCode, addonName)
-    if addonName == "LibAddonMenu-2.0" then
-        EVENT_MANAGER:UnregisterForEvent("GSW_Settings_LAM", EVENT_ADD_ON_LOADED)
-        -- Try to initialize, retry if not ready
-        if not TryInitializeSettings() then
-            zo_callLater(function()
-                if not TryInitializeSettings() then
-                    -- Retry one more time after a longer delay
-                    zo_callLater(TryInitializeSettings, 500)
-                end
-            end, 100)
-        end
-    end
-end
-
--- Also try when our addon loads
+-- Initialize settings when either our addon or LibAddonMenu-2.0 loads
 local function OnAddonLoaded(eventCode, addonName)
-    -- Check for both possible addon names (folder name vs internal name)
-    if addonName == "GroupSetupWarnings" or addonName == "eso-group-setup-warnings" then
-        EVENT_MANAGER:UnregisterForEvent("GSW_Settings", EVENT_ADD_ON_LOADED)
-        -- Try to initialize, retry if not ready
-        if not TryInitializeSettings() then
+    -- Try to initialize when our addon or LAM loads
+    if addonName == "GroupSetupWarnings" or addonName == "LibAddonMenu-2.0" then
+        if TryInitializeSettings() then
+            -- Successfully initialized, unregister
+            EVENT_MANAGER:UnregisterForEvent("GSW_Settings", EVENT_ADD_ON_LOADED)
+        elseif addonName == "GroupSetupWarnings" then
+            -- Our addon loaded but LAM not ready yet, retry after delay
             zo_callLater(function()
-                if not TryInitializeSettings() then
-                    -- Retry one more time after a longer delay
-                    zo_callLater(TryInitializeSettings, 500)
+                if TryInitializeSettings() then
+                    EVENT_MANAGER:UnregisterForEvent("GSW_Settings", EVENT_ADD_ON_LOADED)
                 end
             end, 100)
         end
@@ -263,4 +280,3 @@ local function OnAddonLoaded(eventCode, addonName)
 end
 
 EVENT_MANAGER:RegisterForEvent("GSW_Settings", EVENT_ADD_ON_LOADED, OnAddonLoaded)
-EVENT_MANAGER:RegisterForEvent("GSW_Settings_LAM", EVENT_ADD_ON_LOADED, OnLibAddonMenuLoaded)

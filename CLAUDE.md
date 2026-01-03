@@ -14,8 +14,16 @@ Detect duplicate buffs/sets in **trials** during combat and warn the player. Spe
 | Set | Roaring Opportunist | 135920 | Effect applied event |
 | Set | Symphony of Blades | 117110 | Combat event when proc triggers |
 | Set | Ozezan's Inferno | 188456 | Combat event when proc triggers |
+| Debuff | Major Breach | 61743 | Combat event on hostile target |
+| Enchant | Crusher | 17906 | Combat event on hostile target |
 
 When 2+ players trigger the same ability/buff in the same fight, display a chat warning listing who has duplicates.
+
+### Missing Debuff Warnings
+
+For fights lasting 10+ seconds, warn if these debuffs were NOT applied to any enemy:
+- **Major Breach** - Resistance reduction debuff (from Pierce Armor, Elemental Susceptibility, etc.)
+- **Crusher** - Weapon enchant debuff
 
 ### Trial-Only Activation
 
@@ -62,6 +70,12 @@ A movable UI element that:
 | Roaring Opportunist | Checkbox | On | Detect duplicate set |
 | Symphony of Blades | Checkbox | On | Detect duplicate set |
 | Ozezan's Inferno | Checkbox | On | Detect duplicate set |
+
+### Missing Debuff Warnings
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| Warn Missing Major Breach | Checkbox | On | Warn if no Major Breach on enemies |
+| Warn Missing Crusher | Checkbox | On | Warn if no Crusher on enemies |
 
 ## Feasibility Analysis
 
@@ -208,10 +222,53 @@ Use `.luacheckrc` in repo root with:
 
 ## Best Practices
 
+### Code Organization
+- Use `local` for all variables to avoid polluting the global `_G` table
+- Create ONE global table per addon (e.g., `GSW = {}`) rather than multiple globals
+- Use `GSW = GSW or {}` pattern when splitting code across multiple files
+- Hook class functions rather than object instances for better addon compatibility
+- Variables must be defined before use in their scope
+
+### Performance
 - Semantic versioning (sync manifest with git tags)
-- Throttle group scan events (use zo_callLater)
+- Throttle group scan events (use `zo_callLater`)
 - Cache zone checks to avoid repeated API calls
 - Use savedvars for user thresholds (min CP, required sets)
+- Avoid unnecessary global variable creation
+- Review ZOS library utilities before creating custom solutions
+
+### Event Handling
+- `EVENT_ADD_ON_LOADED` fires for EACH enabled addon - always check the `addonName` parameter
+- Unregister events after handling if not needed for other addons
+- Chat output via `d()` only displays after `EVENT_PLAYER_ACTIVATED`
+- Use LibDebugLogger + DebugLogViewer for logging before chat is available
+
+### Common Mistakes to Avoid
+- **Texture issues**: Delete `shader_cache.cooked` after adding/modifying .dds files
+- **SavedVariables timing**: Changes made while logged in won't take effect until UI reload or loading screen
+- **Manifest files**: Folder and manifest filename must match exactly; logout before changing dependencies
+
+### Testing & Development
+- Use `/script` commands in chat for inline testing
+- Reload UI via `/reloadui` (or create shortcut `/rl`)
+- Install debug addons: merTorchbug, sidTools, or Liliths Command History
+- Always disable other addons during testing to prevent interference
+- Check current API version: `/script d(GetAPIVersion())`
+
+### API Restrictions (What Addons Cannot Do)
+- Cannot access pre-game content or character selection screens
+- Cannot detect non-grouped player positions or enemy locations
+- Cannot modify character/NPC visuals, textures, or effects
+- Cannot play custom sounds or include external 3D objects
+- Cannot load files outside AddOns folder or deeper than 3 subfolder levels
+- Cannot automate "botting related" features (against TOS)
+- Do NOT use LibGroupSocket or LibDataShare for group data sharing
+- Cannot use map pings as a data sharing workaround
+
+### Pre-Release Checklist
+- Test on both keyboard and gamepad interfaces if supporting consoles
+- Verify SavedVariables persist correctly across sessions
+- Review addon upload guidelines before publishing
 
 ## Changelog
 

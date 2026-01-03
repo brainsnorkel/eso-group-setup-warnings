@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.4.0] - 2026-01-04
+### Changed
+- Use ESO's `COMBAT_UNIT_TYPE_PLAYER` constant instead of hardcoded value
+- Add shared version constant (`GSW.version`) for sync between files
+- Consolidate duplicate event registrations in Settings.lua
+- Replace inefficient loop with `next()` for empty table checks
+
+### Fixed
+- Add missing `majorBreach` and `crusher` detection setting defaults
+
+## [1.3.0] - 2026-01-04
+### Added
+- Missing debuff warnings for fights lasting 10+ seconds:
+  - Major Breach (ID 61743) - warns if no player applied this debuff to enemies
+  - Crusher enchant (ID 17906) - warns if no player applied this debuff to enemies
+- New settings section "Missing Debuff Warnings" with toggles for each debuff
+- `targetHostile` flag for abilities that should only be tracked when applied to enemies
+
 ## [1.2.0] - 2026-01-03
 ### Added
 - Debug mode (`/gsw debug`) to show individual buff detections
