@@ -19,6 +19,7 @@ An ESO addon that warns when Champion Points, buffs, or healing sets are duplica
 | `/gsw status` | Show current state and group status |
 | `/gsw unlock` | Unlock indicator for repositioning |
 | `/gsw lock` | Lock indicator position |
+| `/gsw pause` | Toggle pause (temporary, resets on zone change) |
 | `/gsw debug` | Toggle debug mode (shows individual detections) |
 
 ### Settings Panel
