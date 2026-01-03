@@ -51,6 +51,7 @@ globals = {
     "GetGroupSize",
     "zo_strformat",
     "zo_callLater",
+    "GetGameTimeSeconds",
 
     -- Libraries
     "LibAddonMenu2",

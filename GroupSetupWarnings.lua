@@ -8,17 +8,18 @@ local GSW = GroupSetupWarnings
 local ADDON_NAME = "GroupSetupWarnings"
 
 -- Ability IDs to track
--- useTarget = true means use the heal/buff target as the owner (for procs triggered by enemies)
+-- All abilities track the SOURCE (who applied/cast the buff)
+-- sourceType 1 = player, we filter to only count player sources
 local TRACKED_ABILITIES = {
     [156008] = { name = "Enlivening Overflow", type = "CP", settingKey = "enlivening" },
     [156012] = { name = "Enlivening Overflow", type = "CP", settingKey = "enlivening" },  -- Alternate ID
-    [156019] = { name = "From the Brink", type = "CP", settingKey = "fromTheBrink", useTarget = true },
-    [156020] = { name = "From the Brink", type = "CP", settingKey = "fromTheBrink", useTarget = true },  -- Alternate ID
+    [156019] = { name = "From the Brink", type = "CP", settingKey = "fromTheBrink" },
+    [156020] = { name = "From the Brink", type = "CP", settingKey = "fromTheBrink" },  -- Alternate ID
     [66902]  = { name = "Major Courage", type = "Buff", settingKey = "majorCourage" },
     [109966] = { name = "Major Courage", type = "Buff", settingKey = "majorCourage" },  -- Alternate ID (Olorime/etc)
     [135920] = { name = "Roaring Opportunist", type = "Set", settingKey = "roaringOpportunist" },
     [117110] = { name = "Symphony of Blades", type = "Set", settingKey = "symphonyOfBlades" },
-    [117111] = { name = "Symphony of Blades", type = "Set", settingKey = "symphonyOfBlades", useTarget = true },  -- Meridia's Favor buff (target receives)
+    [117111] = { name = "Symphony of Blades", type = "Set", settingKey = "symphonyOfBlades" },  -- Meridia's Favor buff
     [188456] = { name = "Ozezan's Inferno", type = "Set", settingKey = "ozezanInferno" },
 }
 
@@ -33,6 +34,8 @@ local DEFAULT_SETTINGS = {
     showAsIcon = false,
     showInitMessage = true,  -- Show initialization message on load
     debugMode = false,       -- Show individual detections
+    warnMissingCourage = true,  -- Warn if no Major Courage in fight
+    warnMissingEnlivening = true,  -- Warn if no Enlivening Overflow in fight
     -- Detection rules
     enlivening = true,
     fromTheBrink = true,
@@ -48,6 +51,7 @@ local isInTrial = false
 local isInCombat = false
 local fightDetections = {} -- { abilityId = { playerName = true, ... }, ... }
 local warnedThisFight = {} -- { abilityId = true, ... }
+local combatStartTime = 0  -- When combat started (for minimum fight duration check)
 
 -- UI Elements
 local indicator = nil
@@ -183,6 +187,49 @@ local function CheckForDuplicates(abilityId)
     end
 end
 
+-- Helper to check if any ability with given settingKey was detected
+local function HasDetectionForSettingKey(settingKey)
+    for abilityId, info in pairs(TRACKED_ABILITIES) do
+        if info.settingKey == settingKey and fightDetections[abilityId] then
+            -- Check if there's at least one player recorded
+            for _ in pairs(fightDetections[abilityId]) do
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- Minimum fight duration (in seconds) before warning about missing buffs
+local MIN_FIGHT_DURATION = 10
+
+local function CheckForMissingBuffs()
+    if not savedVars or not savedVars.enabled or not isInTrial then return end
+
+    -- Only warn if fight lasted at least MIN_FIGHT_DURATION seconds
+    local fightDuration = GetGameTimeSeconds() - combatStartTime
+    if fightDuration < MIN_FIGHT_DURATION then
+        OutputDebug(string.format("Fight too short (%.1fs) - skipping missing buff check", fightDuration))
+        return
+    end
+
+    -- Check for missing Major Courage
+    if savedVars.warnMissingCourage then
+        if not HasDetectionForSettingKey("majorCourage") and not warnedThisFight["missingCourage"] then
+            warnedThisFight["missingCourage"] = true
+            OutputWarning("No Major Courage detected this fight!")
+        end
+    end
+
+    -- Check for missing Enlivening Overflow
+    if savedVars.warnMissingEnlivening then
+        if not HasDetectionForSettingKey("enlivening") and not warnedThisFight["missingEnlivening"] then
+            warnedThisFight["missingEnlivening"] = true
+            OutputWarning("No Enlivening Overflow detected this fight!")
+        end
+    end
+end
+
 local function RecordAbilityUse(abilityId, playerName)
     if not playerName or playerName == "" then return end
 
@@ -204,6 +251,11 @@ end
 -- Event Handlers
 --------------------------------------------------------------------------------
 
+-- Combat unit type constants (ESO defines these globally)
+-- COMBAT_UNIT_TYPE_PLAYER = 1, COMBAT_UNIT_TYPE_PLAYER_PET = 2, etc.
+-- But we define locally in case they're not available
+local UNIT_TYPE_PLAYER = 1
+
 local function OnCombatEvent(eventCode, result, isError, abilityName, abilityGraphic,
     abilityActionSlotType, sourceName, sourceType, targetName, targetType,
     hitValue, powerType, damageType, log, sourceUnitId, targetUnitId, abilityId)
@@ -218,19 +270,14 @@ local function OnCombatEvent(eventCode, result, isError, abilityName, abilityGra
     -- Check if this specific rule is enabled
     if not savedVars[abilityInfo.settingKey] then return end
 
-    -- Determine which unit to attribute this to
-    -- useTarget: For procs like From the Brink where the target of the heal is the CP owner
-    local playerName
-    if abilityInfo.useTarget then
-        playerName = GetPlayerNameFromUnitId(targetUnitId)
-        if not playerName then
-            playerName = zo_strformat("<<1>>", targetName)
-        end
-    else
-        playerName = GetPlayerNameFromUnitId(sourceUnitId)
-        if not playerName then
-            playerName = zo_strformat("<<1>>", sourceName)
-        end
+    -- Debug: always log the sourceType to help diagnose
+    OutputDebug(string.format("%s: sourceType=%d, source=%s, targetType=%d, target=%s",
+        abilityName, sourceType, tostring(sourceName), targetType, tostring(targetName)))
+
+    -- Get source player name (who applied/cast the buff)
+    local playerName = GetPlayerNameFromUnitId(sourceUnitId)
+    if not playerName then
+        playerName = zo_strformat("<<1>>", sourceName)
     end
 
     if playerName and playerName ~= "" then
@@ -245,6 +292,10 @@ local function OnCombatStateChanged(eventCode, inCombat)
     if inCombat and not wasInCombat then
         -- Entering combat - reset tracking for new fight
         ResetFightTracking()
+        combatStartTime = GetGameTimeSeconds()
+    elseif wasInCombat and not inCombat then
+        -- Leaving combat - check for missing buffs
+        CheckForMissingBuffs()
     end
 end
 
