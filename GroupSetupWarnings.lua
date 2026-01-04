@@ -24,7 +24,7 @@ local TRACKED_ABILITIES = {
 }
 
 -- Addon version (keep in sync with manifest)
-GSW.version = "1.7.0"
+GSW.version = "1.7.1"
 
 -- Default settings
 local DEFAULT_SETTINGS = {
@@ -221,18 +221,29 @@ local function ResetFightTracking()
 end
 
 local function CheckForDuplicates(abilityId)
-    local detection = fightDetections[abilityId]
-    if not detection then return end
+    local abilityInfo = TRACKED_ABILITIES[abilityId]
+    if not abilityInfo then return end
 
-    -- Count unique players
+    -- Use settingKey to track warnings (so multiple IDs for same ability share warning state)
+    local settingKey = abilityInfo.settingKey
+    if warnedThisFight[settingKey] then return end
+
+    -- Count unique players across ALL ability IDs with the same settingKey
     local players = {}
-    for playerName in pairs(detection) do
-        table.insert(players, playerName)
+    local seenPlayers = {}
+    for id, info in pairs(TRACKED_ABILITIES) do
+        if info.settingKey == settingKey and fightDetections[id] then
+            for playerName in pairs(fightDetections[id]) do
+                if not seenPlayers[playerName] then
+                    seenPlayers[playerName] = true
+                    table.insert(players, playerName)
+                end
+            end
+        end
     end
 
-    if #players >= 2 and not warnedThisFight[abilityId] then
-        warnedThisFight[abilityId] = true
-        local abilityInfo = TRACKED_ABILITIES[abilityId]
+    if #players >= 2 then
+        warnedThisFight[settingKey] = true
         local playerList = table.concat(players, ", ")
         OutputWarning(string.format("Duplicate %s (%s) detected: %s",
             abilityInfo.name, abilityInfo.type, playerList))

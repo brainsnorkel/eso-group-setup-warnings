@@ -1,5 +1,9 @@
 # Changelog
 
+## [1.7.1] - 2026-01-04
+### Fixed
+- Fix duplicate warnings firing multiple times for abilities with multiple IDs (e.g., Major Courage, Powerful Assault)
+
 ## [1.7.0] - 2026-01-04
 ### Added
 - Powerful Assault set duplicate detection (ability IDs 61771, 61763)
