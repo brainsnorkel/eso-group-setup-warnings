@@ -34,12 +34,12 @@ The addon warns when **2+ players trigger the same ability** in a single fight. 
 
 | Type | Name | Why It Matters |
 |------|------|----------------|
-| CP | Enlivening Overflow | Only one player needs this slotted; duplicates waste CP allocation |
-| Buff | Major Courage | Multiple sources (Olorime, SPC) don't stack |
-| Skill | Frost Cloak | Multiple Wardens casting this is redundant |
-| Set | Symphony of Blades | Resource restore doesn't stack effectively |
-| Set | Ozezan's Inferno | Damage bonus doesn't stack from multiple sets |
-| Set | Powerful Assault | Weapon/Spell Damage buff doesn't stack from multiple sets |
+| CP | Enlivening Overflow | Only one player needs this CP slotted |
+| Buff | Major Courage | Multiple sources (Olorime, SPC) don't stack - usually only 1 set required |
+| Skill | Frost Cloak | Multiple players casting group major resolve is usually redundant |
+| Set | Symphony of Blades | Buff doesn't stack - usually only 1 set required |
+| Set | Ozezan's Inferno | Buff doesn't stack from multiple sets - usually only 1 set required|
+| Set | Powerful Assault | Buff doesn't stack from multiple sets - usually only 1 set required |
 
 ### Missing Buff Warnings
 
@@ -47,9 +47,9 @@ At the end of fights lasting **10+ seconds**, the addon warns if important buffs
 
 | Buff | What It Means |
 |------|---------------|
-| Major Courage | No healer applied this group damage buff |
+| Major Courage | No player applied this significant group damage buff |
 | Enlivening Overflow | No one has this healing CP slotted |
-| Frost Cloak | No Warden provided Major Resolve |
+| Frost Cloak | Nobody provided Major Resolve for the group |
 
 ## How Detection Works
 
