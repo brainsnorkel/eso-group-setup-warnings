@@ -1,6 +1,6 @@
 # Group Setup Warnings
 
-An ESO addon that warns when Champion Points, buffs, or healing sets are duplicated in your group. It also alerts you when important buffs are missing from a fight.
+An ESO addon that warns when certain Champion Points, buffs, or healing sets are duplicated in your group. It also alerts you when important buffs are missing from a fight. It's not everything, but it's something.
 
 ## How to Use
 
@@ -28,7 +28,7 @@ Open the addon settings via `/gswsettings` or the ESO settings menu (requires Li
 
 ## What Gets Detected
 
-### Duplicate Detection
+### Duplicate Set/Buff Provider Detection
 
 The addon warns when **2+ players trigger the same ability** in a single fight. This catches wasted resources where buffs don't stack:
 
