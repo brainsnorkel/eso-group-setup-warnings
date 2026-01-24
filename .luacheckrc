@@ -11,7 +11,7 @@ exclude_files = {
 globals = {
     -- Addon globals
     "GroupSetupWarnings",
-    "GroupSetupWarningsIndicator",
+    "GroupSetupWarningsResultsWindow",
 
     -- ESO Core
     "EVENT_MANAGER",

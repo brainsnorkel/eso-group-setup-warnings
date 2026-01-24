@@ -1,40 +1,71 @@
 <GuiXml>
     <Controls>
-        <TopLevelControl name="GroupSetupWarningsIndicator" mouseEnabled="true" movable="true" clampedToScreen="true" hidden="true">
-            <Dimensions x="100" y="24" />
-            <Anchor point="CENTER" relativeTo="GuiRoot" relativePoint="CENTER" offsetX="0" offsetY="-200" />
+        <!-- Results Window (shows detected problems) -->
+        <TopLevelControl name="GroupSetupWarningsResultsWindow" mouseEnabled="true" movable="true" clampedToScreen="true" hidden="true" resizeHandleSize="10">
+            <Dimensions x="400" y="300" />
+            <DimensionConstraints minX="300" minY="200" maxX="800" maxY="600" />
+            <Anchor point="CENTER" relativeTo="GuiRoot" relativePoint="CENTER" offsetX="0" offsetY="0" />
 
             <OnMoveStop>
-                GroupSetupWarnings.OnIndicatorMoveStop()
+                GroupSetupWarnings.OnResultsWindowMoveStop()
             </OnMoveStop>
 
-            <OnMouseUp>
-                GroupSetupWarnings.OnIndicatorClicked(button)
-            </OnMouseUp>
+            <OnResizeStop>
+                GroupSetupWarnings.OnResultsWindowResizeStop()
+            </OnResizeStop>
 
             <Controls>
                 <!-- Background -->
                 <Backdrop name="$(parent)BG" inherits="ZO_DefaultBackdrop">
                     <AnchorFill />
-                    <OnInitialized>
-                        self:SetAlpha(0.7)
-                    </OnInitialized>
                 </Backdrop>
 
-                <!-- Text Label -->
-                <Label name="$(parent)Label" font="ZoFontGameSmall" color="00FF00" horizontalAlignment="CENTER" verticalAlignment="CENTER">
-                    <AnchorFill />
+                <!-- Title Bar -->
+                <Control name="$(parent)TitleBar">
+                    <Dimensions x="400" y="40" />
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)" relativePoint="TOPLEFT" offsetX="0" offsetY="0" />
+                    <Anchor point="TOPRIGHT" relativeTo="$(parent)" relativePoint="TOPRIGHT" offsetX="0" offsetY="0" />
+
+                    <Controls>
+                        <Backdrop name="$(parent)BG" inherits="ZO_ThinBackdrop">
+                            <AnchorFill />
+                            <OnInitialized>
+                                self:SetCenterColor(0.1, 0.1, 0.1, 0.9)
+                            </OnInitialized>
+                        </Backdrop>
+
+                        <Label name="$(parent)Title" font="ZoFontWinH4" horizontalAlignment="LEFT" verticalAlignment="CENTER">
+                            <Anchor point="LEFT" relativeTo="$(parent)" relativePoint="LEFT" offsetX="10" offsetY="0" />
+                            <OnInitialized>
+                                self:SetText("Group Setup Warnings - Combat Results")
+                            </OnInitialized>
+                        </Label>
+
+                        <!-- Close Button -->
+                        <Button name="$(parent)CloseButton" inherits="ZO_CloseButton">
+                            <Anchor point="RIGHT" relativeTo="$(parent)" relativePoint="RIGHT" offsetX="-5" offsetY="0" />
+                            <OnClicked>
+                                GroupSetupWarnings.HideResultsWindow()
+                            </OnClicked>
+                        </Button>
+                    </Controls>
+                </Control>
+
+                <!-- Content Area with Label -->
+                <Label name="$(parent)ContentLabel" font="ZoFontGame" verticalAlignment="TOP" wrapMode="TRUNCATE_END">
+                    <Anchor point="TOPLEFT" relativeTo="$(parent)TitleBar" relativePoint="BOTTOMLEFT" offsetX="10" offsetY="10" />
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)" relativePoint="BOTTOMRIGHT" offsetX="-10" offsetY="-25" />
                     <OnInitialized>
-                        self:SetText("GSW")
+                        self:SetText("No issues detected.")
                     </OnInitialized>
                 </Label>
 
-                <!-- Icon (hidden by default, shown when icon mode enabled) -->
-                <Texture name="$(parent)Icon" hidden="true">
-                    <Dimensions x="20" y="20" />
-                    <Anchor point="CENTER" relativeTo="$(parent)" relativePoint="CENTER" />
+                <!-- Resize Handle (bottom-right corner) -->
+                <Texture name="$(parent)ResizeHandle" textureFile="/esoui/art/miscellaneous/resizer_corner.dds">
+                    <Dimensions x="16" y="16" />
+                    <Anchor point="BOTTOMRIGHT" relativeTo="$(parent)" relativePoint="BOTTOMRIGHT" offsetX="-2" offsetY="-2" />
                     <OnInitialized>
-                        self:SetTexture("/esoui/art/icons/ability_buff_major_resolve.dds")
+                        self:SetAlpha(0.5)
                     </OnInitialized>
                 </Texture>
             </Controls>

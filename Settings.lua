@@ -46,34 +46,6 @@ local function CreateOptionsTable()
         },
         {
             type = "checkbox",
-            name = "Show Status Indicator",
-            tooltip = "Display the 'GSW' indicator on screen when in a group.",
-            getFunc = function() return savedVars.showIndicator end,
-            setFunc = function(value)
-                savedVars.showIndicator = value
-                if GSW.UpdateIndicator then
-                    GSW.UpdateIndicator()
-                end
-            end,
-            width = "full",
-            default = true,
-        },
-        {
-            type = "checkbox",
-            name = "Lock Indicator Position",
-            tooltip = "When locked, the indicator cannot be dragged. Use /gsw unlock to reposition it.",
-            getFunc = function() return savedVars.indicatorLocked end,
-            setFunc = function(value)
-                savedVars.indicatorLocked = value
-                if GSW.UpdateIndicator then
-                    GSW.UpdateIndicator()
-                end
-            end,
-            width = "full",
-            default = true,
-        },
-        {
-            type = "checkbox",
             name = "Show Initialization Message",
             tooltip = "Show 'Group Setup Warnings loaded' message in chat when you log in or reload UI.",
             getFunc = function() return savedVars.showInitMessage end,
@@ -81,29 +53,26 @@ local function CreateOptionsTable()
             width = "full",
             default = true,
         },
-
-        -- Indicator Appearance Header
         {
-            type = "header",
-            name = "Indicator Appearance",
+            type = "checkbox",
+            name = "Show Results Window",
+            tooltip = "Display a results window after combat showing detected duplicates and missing buffs.",
+            getFunc = function() return savedVars.showResultsWindow end,
+            setFunc = function(value) savedVars.showResultsWindow = value end,
             width = "full",
+            default = true,
         },
         {
-            type = "slider",
-            name = "Font Size",
-            tooltip = "Text size for the on-screen 'GSW' indicator (12-24 pixels).",
-            min = 12,
-            max = 24,
-            step = 1,
-            getFunc = function() return savedVars.fontSize end,
-            setFunc = function(value)
-                savedVars.fontSize = value
-                if GSW.UpdateIndicator then
-                    GSW.UpdateIndicator()
+            type = "button",
+            name = "Show Window (for positioning)",
+            tooltip = "Click to display the results window so you can move and resize it. " ..
+                "The window will show your current addon status.",
+            func = function()
+                if GSW.ShowResultsWindowForPositioning then
+                    GSW.ShowResultsWindowForPositioning()
                 end
             end,
-            width = "full",
-            default = 16,
+            width = "half",
         },
 
         -- Detection Rules Header

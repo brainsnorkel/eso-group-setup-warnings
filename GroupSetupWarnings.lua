@@ -29,13 +29,14 @@ GSW.version = "1.7.1"
 -- Default settings
 local DEFAULT_SETTINGS = {
     enabled = true,
-    showIndicator = true,
-    indicatorLocked = true,
-    indicatorX = nil,
-    indicatorY = nil,
-    fontSize = 16,
     showInitMessage = true,  -- Show initialization message on load
     debugMode = false,       -- Show individual detections
+    -- Results window settings
+    showResultsWindow = true,  -- Show results window after combat
+    resultsWindowX = nil,
+    resultsWindowY = nil,
+    resultsWindowWidth = 400,
+    resultsWindowHeight = 300,
     -- Missing buff warnings: Small (2-4) and Large (5+) toggles
     -- If both are off, warning is disabled for that buff
     warnMissingCourageSmall = false,
@@ -70,45 +71,15 @@ local warnedThisFight = {} -- { abilityId = true, ... }
 local combatStartTime = 0  -- When combat started (for minimum fight duration check)
 
 -- UI Elements
-local indicator = nil
-local indicatorLabel = nil
+local resultsWindow = nil
+local resultsContentLabel = nil
 
--- UpdateIndicator function - defined on GSW table for access from Settings.lua
-function GSW.UpdateIndicator()
-    if not indicator or not savedVars then return end
+-- Results tracking (for displaying in window)
+local combatResults = {
+    duplicates = {},  -- { {name="...", type="...", players={...}}, ... }
+    missing = {},     -- { "Missing Major Courage", "Missing Enlivening Overflow", ... }
+}
 
-    local isUnlocked = not savedVars.indicatorLocked
-    -- Show indicator if: (enabled AND in trial) OR (unlocked for repositioning) OR paused
-    local shouldShow = isUnlocked or isPaused or (savedVars.showIndicator and savedVars.enabled and isInTrial)
-
-    indicator:SetHidden(not shouldShow)
-
-    if shouldShow then
-        -- Update font size
-        local fontString = string.format("$(MEDIUM_FONT)|%d|soft-shadow-thin", savedVars.fontSize)
-        indicatorLabel:SetFont(fontString)
-
-        -- Show "GSW not active" when unlocked but not active
-        if isUnlocked and not savedVars.enabled then
-            indicatorLabel:SetText("GSW not active")
-            indicatorLabel:SetColor(0.5, 0.5, 0.5, 1) -- Gray
-        elseif isPaused then
-            indicatorLabel:SetText("GSW (Paused)")
-            indicatorLabel:SetColor(1, 0.5, 0, 1) -- Orange
-        elseif isUnlocked and not isInTrial then
-            indicatorLabel:SetText("GSW not active")
-            indicatorLabel:SetColor(0.5, 0.5, 0.5, 1) -- Gray
-        else
-            indicatorLabel:SetText("GSW")
-            indicatorLabel:SetColor(0, 1, 0, 1) -- Green
-        end
-
-        -- Update movability - allow mouse interaction when unlocked OR when clickable for pause toggle
-        indicator:SetMovable(isUnlocked)
-        -- Always enable mouse for click-to-pause when in trial
-        indicator:SetMouseEnabled(isUnlocked or isInTrial)
-    end
-end
 
 --------------------------------------------------------------------------------
 -- Utility Functions
@@ -204,8 +175,6 @@ local function CheckTrialStatus()
             OutputInfo("Duplicate detection inactive")
         end
     end
-
-    GSW.UpdateIndicator()
 end
 
 -- Expose for Settings.lua to call when group size requirement changes
@@ -218,6 +187,8 @@ GSW.CheckTrialStatus = CheckTrialStatus
 local function ResetFightTracking()
     fightDetections = {}
     warnedThisFight = {}
+    combatResults.duplicates = {}
+    combatResults.missing = {}
 end
 
 local function CheckForDuplicates(abilityId)
@@ -247,6 +218,13 @@ local function CheckForDuplicates(abilityId)
         local playerList = table.concat(players, ", ")
         OutputWarning(string.format("Duplicate %s (%s) detected: %s",
             abilityInfo.name, abilityInfo.type, playerList))
+
+        -- Store for results window
+        table.insert(combatResults.duplicates, {
+            name = abilityInfo.name,
+            type = abilityInfo.type,
+            players = players
+        })
     end
 end
 
@@ -280,7 +258,9 @@ local function CheckForMissingBuffs()
     if IsDetectionEnabledForGroupSize("warnMissingCourage") then
         if not HasDetectionForSettingKey("majorCourage") and not warnedThisFight["missingCourage"] then
             warnedThisFight["missingCourage"] = true
-            OutputWarning("No Major Courage detected this fight!")
+            local msg = "No Major Courage detected this fight!"
+            OutputWarning(msg)
+            table.insert(combatResults.missing, "Major Courage")
         end
     end
 
@@ -288,7 +268,9 @@ local function CheckForMissingBuffs()
     if IsDetectionEnabledForGroupSize("warnMissingEnlivening") then
         if not HasDetectionForSettingKey("enlivening") and not warnedThisFight["missingEnlivening"] then
             warnedThisFight["missingEnlivening"] = true
-            OutputWarning("No Enlivening Overflow detected this fight!")
+            local msg = "No Enlivening Overflow detected this fight!"
+            OutputWarning(msg)
+            table.insert(combatResults.missing, "Enlivening Overflow")
         end
     end
 
@@ -296,7 +278,9 @@ local function CheckForMissingBuffs()
     if IsDetectionEnabledForGroupSize("warnMissingFrostCloak") then
         if not HasDetectionForSettingKey("frostCloak") and not warnedThisFight["missingFrostCloak"] then
             warnedThisFight["missingFrostCloak"] = true
-            OutputWarning("No Frost Cloak (Major Resolve) detected this fight!")
+            local msg = "No Frost Cloak (Major Resolve) detected this fight!"
+            OutputWarning(msg)
+            table.insert(combatResults.missing, "Frost Cloak (Major Resolve)")
         end
     end
 end
@@ -362,8 +346,13 @@ local function OnCombatStateChanged(eventCode, inCombat)
         ResetFightTracking()
         combatStartTime = GetGameTimeSeconds()
     elseif wasInCombat and not inCombat then
-        -- Leaving combat - check for missing buffs
+        -- Leaving combat - check for missing buffs and show results
         CheckForMissingBuffs()
+
+        -- Show results window if there were any issues
+        if savedVars and savedVars.enabled and not isPaused and isInTrial then
+            GSW.ShowResultsWindow()
+        end
     end
 end
 
@@ -396,50 +385,140 @@ end
 -- UI Functions
 --------------------------------------------------------------------------------
 
-function GSW.OnIndicatorMoveStop()
-    if not indicator or not savedVars then return end
+-- Results Window Functions
+function GSW.ShowResultsWindow()
+    if not resultsWindow or not savedVars then return end
+    if not savedVars.showResultsWindow then return end
 
-    -- Save the top-left position relative to screen
-    local left = indicator:GetLeft()
-    local top = indicator:GetTop()
-    savedVars.indicatorX = left
-    savedVars.indicatorY = top
+    -- Build results text
+    local lines = {}
+
+    if #combatResults.duplicates > 0 then
+        table.insert(lines, "|cFF6600DUPLICATE DETECTIONS:|r")
+        for _, dup in ipairs(combatResults.duplicates) do
+            local playerList = table.concat(dup.players, ", ")
+            table.insert(lines, string.format("  • %s (%s): %s", dup.name, dup.type, playerList))
+        end
+    end
+
+    if #combatResults.missing > 0 then
+        if #lines > 0 then
+            table.insert(lines, "")  -- Blank line separator
+        end
+        table.insert(lines, "|cFF6600MISSING BUFFS:|r")
+        for _, missing in ipairs(combatResults.missing) do
+            table.insert(lines, string.format("  • %s", missing))
+        end
+    end
+
+    if #lines == 0 then
+        -- No issues detected - don't show window
+        return
+    end
+
+    local resultsText = table.concat(lines, "\n")
+    resultsContentLabel:SetText(resultsText)
+
+    resultsWindow:SetHidden(false)
 end
 
-local function RestoreIndicatorPosition()
-    if not indicator or not savedVars then return end
+function GSW.ShowResultsWindowForPositioning()
+    if not resultsWindow or not resultsContentLabel or not savedVars then return end
 
-    if savedVars.indicatorX and savedVars.indicatorY then
-        indicator:ClearAnchors()
-        indicator:SetAnchor(TOPLEFT, GuiRoot, TOPLEFT, savedVars.indicatorX, savedVars.indicatorY)
+    -- Build status text
+    local lines = {}
+
+    -- Addon status
+    local statusColor = savedVars.enabled and "|c00FF00" or "|cFF0000"
+    local statusText = savedVars.enabled and "ENABLED" or "DISABLED"
+    table.insert(lines, string.format("Addon Status: %s%s|r", statusColor, statusText))
+    table.insert(lines, "")
+
+    -- Group status
+    local groupCategory = GetGroupSizeCategory()
+    if groupCategory == "none" then
+        table.insert(lines, "|c888888Not in a group|r")
+    elseif groupCategory == "small" then
+        table.insert(lines, "|c00CCFFIn small group (2-4 players)|r")
+    else
+        table.insert(lines, "|c00CCFFIn large group (5+ players)|r")
+    end
+    table.insert(lines, "")
+
+    -- Pause status
+    if isPaused then
+        table.insert(lines, "|cFF6600Detection PAUSED (until zone change)|r")
+        table.insert(lines, "")
+    end
+
+    -- Instructions
+    table.insert(lines, "|cFFFFFFYou can now:|r")
+    table.insert(lines, "  • Drag the title bar to move this window")
+    table.insert(lines, "  • Drag the bottom-right corner to resize")
+    table.insert(lines, "  • Close when done positioning")
+    table.insert(lines, "")
+    table.insert(lines, "|c888888This window will appear after combat")
+    table.insert(lines, "when duplicates or missing buffs are detected.|r")
+
+    local positioningText = table.concat(lines, "\n")
+    resultsContentLabel:SetText(positioningText)
+
+    resultsWindow:SetHidden(false)
+end
+
+function GSW.HideResultsWindow()
+    if resultsWindow then
+        resultsWindow:SetHidden(true)
+    end
+end
+
+function GSW.OnResultsWindowMoveStop()
+    if not resultsWindow or not savedVars then return end
+
+    local left = resultsWindow:GetLeft()
+    local top = resultsWindow:GetTop()
+    savedVars.resultsWindowX = left
+    savedVars.resultsWindowY = top
+end
+
+function GSW.OnResultsWindowResizeStop()
+    if not resultsWindow or not savedVars then return end
+
+    local width = resultsWindow:GetWidth()
+    local height = resultsWindow:GetHeight()
+    savedVars.resultsWindowWidth = width
+    savedVars.resultsWindowHeight = height
+end
+
+local function RestoreResultsWindowPosition()
+    if not resultsWindow or not savedVars then return end
+
+    if savedVars.resultsWindowX and savedVars.resultsWindowY then
+        resultsWindow:ClearAnchors()
+        resultsWindow:SetAnchor(TOPLEFT, GuiRoot, TOPLEFT, savedVars.resultsWindowX, savedVars.resultsWindowY)
+    end
+
+    if savedVars.resultsWindowWidth and savedVars.resultsWindowHeight then
+        resultsWindow:SetDimensions(savedVars.resultsWindowWidth, savedVars.resultsWindowHeight)
     end
 end
 
 local function InitializeUI()
-    indicator = GroupSetupWarningsIndicator
-    if indicator then
-        indicatorLabel = indicator:GetNamedChild("Label")
-        RestoreIndicatorPosition()
-        GSW.UpdateIndicator()
+    resultsWindow = GroupSetupWarningsResultsWindow
+    if resultsWindow then
+        resultsContentLabel = resultsWindow:GetNamedChild("ContentLabel")
+        RestoreResultsWindowPosition()
     end
 end
 
 --------------------------------------------------------------------------------
--- Pause Toggle (click-to-pause feature)
+-- Pause Toggle
 --------------------------------------------------------------------------------
 
 function GSW.TogglePause()
     isPaused = not isPaused
     local status = isPaused and "paused" or "resumed"
     OutputInfo("Detection " .. status .. (isPaused and " (until zone change)" or ""))
-    GSW.UpdateIndicator()
-end
-
-function GSW.OnIndicatorClicked(button)
-    -- Only toggle pause on left click when indicator is locked (not being dragged)
-    if button == MOUSE_BUTTON_INDEX_LEFT and savedVars and savedVars.indicatorLocked then
-        GSW.TogglePause()
-    end
 end
 
 --------------------------------------------------------------------------------
@@ -454,32 +533,17 @@ local function HandleSlashCommand(args)
         savedVars.enabled = not savedVars.enabled
         local status = savedVars.enabled and "enabled" or "disabled"
         OutputInfo("Warnings " .. status)
-        GSW.UpdateIndicator()
 
     elseif command == "on" then
         savedVars.enabled = true
         OutputInfo("Warnings enabled")
-        GSW.UpdateIndicator()
 
     elseif command == "off" then
         savedVars.enabled = false
         OutputInfo("Warnings disabled")
-        GSW.UpdateIndicator()
 
     elseif command == "status" then
-        local status = savedVars.enabled and "enabled" or "disabled"
-        local trialStatus = isInTrial and "in trial" or "not in trial"
-        OutputInfo(string.format("Warnings: %s | %s", status, trialStatus))
-
-    elseif command == "unlock" then
-        savedVars.indicatorLocked = false
-        OutputInfo("Indicator unlocked - drag to reposition")
-        GSW.UpdateIndicator()
-
-    elseif command == "lock" then
-        savedVars.indicatorLocked = true
-        OutputInfo("Indicator locked")
-        GSW.UpdateIndicator()
+        GSW.ShowResultsWindowForPositioning()
 
     elseif command == "pause" then
         GSW.TogglePause()
@@ -490,7 +554,7 @@ local function HandleSlashCommand(args)
         OutputInfo("Debug mode " .. status)
 
     else
-        OutputInfo("Commands: /gsw [on|off|status|unlock|lock|pause|debug]")
+        OutputInfo("Commands: /gsw [on|off|status|pause|debug]")
     end
 end
 
