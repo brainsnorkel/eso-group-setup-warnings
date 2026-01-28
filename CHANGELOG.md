@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.8.0] - 2026-01-28
+### Changed
+- Replace status indicator with results window UI
+- Window displays duplicates and missing buffs after combat ends
+- Window shows addon status (enabled/paused/group size)
+- Add settings button to show window for positioning
+- Update `/gsw status` to show results window instead of chat output
+- Simplify slash commands (remove `/gsw unlock` and `/gsw lock`)
+
+### Fixed
+- Missing buff warnings now work correctly even when duplicate detection is disabled
+
 ## [1.7.1] - 2026-01-04
 ### Fixed
 - Fix duplicate warnings firing multiple times for abilities with multiple IDs (e.g., Major Courage, Powerful Assault)

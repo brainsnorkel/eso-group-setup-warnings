@@ -7,6 +7,13 @@ local GSW = GroupSetupWarnings
 -- Addon name is the folder name in ESO
 local ADDON_NAME = "GroupSetupWarnings"
 
+-- Mapping from settingKey to corresponding missing buff warning key (if any)
+local MISSING_BUFF_SETTINGS = {
+    majorCourage = "warnMissingCourage",
+    enlivening = "warnMissingEnlivening",
+    frostCloak = "warnMissingFrostCloak",
+}
+
 -- Ability IDs to track
 -- All abilities track the SOURCE (who applied/cast the buff)
 -- sourceType 1 = player, we filter to only count player sources
@@ -199,6 +206,10 @@ local function CheckForDuplicates(abilityId)
     local settingKey = abilityInfo.settingKey
     if warnedThisFight[settingKey] then return end
 
+    -- Only warn about duplicates if duplicate detection is enabled
+    -- (Recording may have happened for missing buff warning purposes)
+    if not IsDetectionEnabledForGroupSize(settingKey) then return end
+
     -- Count unique players across ALL ability IDs with the same settingKey
     local players = {}
     local seenPlayers = {}
@@ -319,8 +330,12 @@ local function OnCombatEvent(eventCode, result, isError, abilityName, abilityGra
     -- Only process if enabled, not paused, and in group
     if not savedVars.enabled or isPaused or not isInTrial then return end
 
-    -- Check if this specific rule is enabled for current group size
-    if not IsDetectionEnabledForGroupSize(abilityInfo.settingKey) then return end
+    -- Check if either duplicate detection OR missing buff warning is enabled
+    -- (We need to record detections for missing buff warnings even if duplicate detection is off)
+    local isDetectionEnabled = IsDetectionEnabledForGroupSize(abilityInfo.settingKey)
+    local missingBuffKey = MISSING_BUFF_SETTINGS[abilityInfo.settingKey]
+    local isMissingWarningEnabled = missingBuffKey and IsDetectionEnabledForGroupSize(missingBuffKey)
+    if not isDetectionEnabled and not isMissingWarningEnabled then return end
 
     -- Debug: always log the sourceType to help diagnose
     OutputDebug(string.format("%s: sourceType=%d, source=%s, targetType=%d, target=%s",
